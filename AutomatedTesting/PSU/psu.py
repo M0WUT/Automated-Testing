@@ -1,4 +1,4 @@
-from base_instrument import BaseInstrument
+from AutomatedTesting.TopLevel.base_instrument import BaseInstrument
 
 
 class PowerSupply(BaseInstrument):
@@ -7,6 +7,7 @@ class PowerSupply(BaseInstrument):
     This should never be implemented directly
 
     Args:
+        name (str): Identifying string for power supply
         resourceManager (pyvisa.ResourceManager):
             PyVisa Resource Manager.
         address (str):
@@ -30,6 +31,8 @@ class PowerSupply(BaseInstrument):
     """
     def __init__(
         self,
+        id,
+        name,
         resourceManager,
         channelCount,
         channels,
@@ -38,6 +41,8 @@ class PowerSupply(BaseInstrument):
         address,
         **kwargs
     ):
+        self.id = id
+        self.name = name
         # Check that we have a continous list of channels from
         # ID = 1 -> channelCount
         assert len(channels) == channelCount
@@ -49,6 +54,7 @@ class PowerSupply(BaseInstrument):
         for x in self.channels:
             x.psu = self
 
+        self.channelCount = channelCount
         self.hasOVP = hasOVP
         self.hasOCP = hasOCP
 
@@ -61,13 +67,22 @@ class PowerSupply(BaseInstrument):
     def set_channel_voltage(self, channelNumber, voltage):
         raise NotImplementedError
 
-    def read_channel_voltage(self, channelNumber):
+    def read_channel_voltage_setpoint(self, channelNumber):
+        raise NotImplementedError
+
+    def measure_channel_voltage(self, channelNumber):
         raise NotImplementedError
 
     def set_channel_current(self, channelNumber, current):
         raise NotImplementedError
 
-    def read_channel_current(self, channelNumber):
+    def read_channel_current_setpoint(self, channelNumber):
+        raise NotImplementedError
+
+    def measure_channel_current(self, channelNumber):
+        raise NotImplementedError
+
+    def enable_channel_output(self, channelNumber, enabled):
         raise NotImplementedError
 
     def validate_channel_number(self, channelNumber):
@@ -88,7 +103,10 @@ class PowerSupply(BaseInstrument):
             channelNumber < 0 or
             channelNumber > self.channelCount
         ):
-            raise ValueError
+            raise ValueError(
+                f"Invalid channel number {channelNumber} for "
+                f"{self.name}"
+            )
 
 
 class PowerSupplyChannel():
@@ -155,13 +173,31 @@ class PowerSupplyChannel():
         """
         if(self.minVoltage <= voltage <= self.maxVoltage):
             self.psu.set_channel_voltage(self.channelNumber, voltage)
-            assert(self.read_voltage() == voltage)
+            assert(self.read_voltage_setpoint() == voltage)
         else:
-            raise ValueError
+            raise ValueError(
+                f"Requested voltage of {voltage}V outside limits for "
+                f"Power supply {self.psu.name}, channel {self.channelNumber}"
+            )
 
-    def read_voltage(self):
+    def read_voltage_setpoint(self):
         """
-        Reads channel output voltage
+        Reads channel output voltage setpoint
+
+        Args:
+            None
+
+        Returns:
+            voltage (float): channel output voltage setpoint in Volts
+
+        Raises:
+            None
+        """
+        return self.psu.read_channel_voltage_setpoint(self.channelNumber)
+
+    def measure_voltage(self):
+        """
+        Measures channel output voltage
 
         Args:
             None
@@ -172,7 +208,7 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.read_channel_voltage(self.channelNumber)
+        return self.psu.measure_channel_voltage(self.channelNumber)
 
     def set_current(self, current):
         """
@@ -191,14 +227,32 @@ class PowerSupplyChannel():
         """
         if(self.minCurrent <= current <= self.maxCurrent):
             self.psu.set_channel_current(self.channelNumber, current)
-            x = self.read_current()
+            x = self.read_current_setpoint()
             assert(x == current)
         else:
-            raise ValueError
+            raise ValueError(
+                f"Requested current of {current}A outside limits for "
+                f"Power supply {self.psu.name}, channel {self.channelNumber}"
+            )
 
-    def read_current(self):
+    def read_current_setpoint(self):
         """
-        Reads channel output current
+        Reads channel output current setpoint
+
+        Args:
+            None
+
+        Returns:
+            current (float): channel output current setpoint in Amps
+
+        Raises:
+            None
+        """
+        return self.psu.read_channel_current_setpoint(self.channelNumber)
+
+    def measure_current(self):
+        """
+        Measures channel output current
 
         Args:
             None
@@ -209,4 +263,19 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.read_channel_current(self.channelNumber)
+        return self.psu.measure_channel_current(self.channelNumber)
+
+    def enable_output(self, enabled):
+        """
+        Enables / Disables channel output
+
+        Args:
+            enabled (bool): 0 = Disable output, 1 = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        return self.psu.enable_channel_output(self.channelNumber, enabled)

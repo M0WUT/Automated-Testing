@@ -1,5 +1,3 @@
-
-
 class BaseInstrument():
     def __init__(self, resourceManager, address, **kwargs):
         """

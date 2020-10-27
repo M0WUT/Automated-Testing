@@ -1,4 +1,4 @@
-from psu import PowerSupply, PowerSupplyChannel
+from AutomatedTesting.PSU.psu import PowerSupply, PowerSupplyChannel
 from pyvisa.errors import VisaIOError
 from time import sleep
 
@@ -23,9 +23,6 @@ class Tenma_72_2535(PowerSupply):
     """
     def __init__(self, resourceManager, address):
 
-        self.id = "TENMA 72-2535 V2.1"
-        self.channelCount = 1
-
         channel1 = PowerSupplyChannel(
             channelNumber=1,
             maxVoltage=30.0,
@@ -35,8 +32,10 @@ class Tenma_72_2535(PowerSupply):
         )
 
         super().__init__(
+            id="TENMA 72-2535 V2.1",
+            name="Tenma 72-2535",
             resourceManager=resourceManager,
-            channelCount=self.channelCount,
+            channelCount=1,
             channels=[channel1],
             hasOVP=True,
             hasOCP=True,
@@ -46,6 +45,8 @@ class Tenma_72_2535(PowerSupply):
             write_termination=None,
             timeout=500
         )
+
+        self.enable_channel_output(1, False)
 
     def read_id(self):
         """
@@ -134,7 +135,7 @@ class Tenma_72_2535(PowerSupply):
         super().validate_channel_number(channelNumber)
         self._write(f"VSET{channelNumber}:{round(voltage, 2)}")
 
-    def read_channel_voltage(self, channelNumber):
+    def read_channel_voltage_setpoint(self, channelNumber):
         """
         Reads voltage setpoint on channel <channelNumber>
 
@@ -150,6 +151,23 @@ class Tenma_72_2535(PowerSupply):
         """
         super().validate_channel_number(channelNumber)
         return float(self._query(f"VSET{channelNumber}?"))
+
+    def measure_channel_voltage(self, channelNumber):
+        """
+        Reads output voltage on channel <channelNumber>
+
+        Args:
+            channelNumber (int): Power Supply Channel Number
+                to read
+
+        Returns:
+            float: Channel's output voltage in Volts
+
+        Raises:
+            ValueError: If channelNumber is not valid
+        """
+        super().validate_channel_number(channelNumber)
+        return float(self._query(f"VOUT{channelNumber}?"))
 
     def set_channel_current(self, channelNumber, current):
         """
@@ -169,7 +187,7 @@ class Tenma_72_2535(PowerSupply):
         super().validate_channel_number(channelNumber)
         self._write(f"ISET{channelNumber}:{round(current, 3)}")
 
-    def read_channel_current(self, channelNumber):
+    def read_channel_current_setpoint(self, channelNumber):
         """
         Reads current setpoint on channel <channelNumber>
 
@@ -186,12 +204,36 @@ class Tenma_72_2535(PowerSupply):
         super().validate_channel_number(channelNumber)
         return float(self._query(f"ISET{channelNumber}?"))
 
+    def measure_channel_current(self, channelNumber):
+        """
+        Reads output current on channel <channelNumber>
 
-if __name__ == '__main__':
-    import pyvisa
-    # PyVisa Resource Manager
-    rm = pyvisa.ResourceManager('@py')
+        Args:
+            channelNumber (int): Power Supply Channel Number
+                to read
 
-    psu1 = Tenma_72_2535(rm, "ASRL/dev/ttyACM0::INSTR")
-    psu1.channels[0].set_voltage(3.0)
-    psu1.channels[0].set_current(0.5)
+        Returns:
+            float: Channel's output current in Amps
+
+        Raises:
+            ValueError: If channelNumber is not valid
+        """
+        super().validate_channel_number(channelNumber)
+        return float(self._query(f"IOUT{channelNumber}?"))
+
+    def enable_channel_output(self, channelNumber, enabled):
+        """
+        Enables / Disables channel output
+
+        Args:
+            channelNumber (int): Power Supply Channel Number
+            enabled (bool): 0 = Disable output, 1 = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If enabled is not 0/1 or True/False
+        """
+        super().validate_channel_number(channelNumber)
+        self._write(f"OUT{1 if bool(enabled) else 0}")
