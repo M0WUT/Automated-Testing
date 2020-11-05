@@ -9,8 +9,6 @@ class Tenma_72_2535(PowerSupply):
     NB All the sleep() are really important
 
     Args:
-        resourceManager (pyvisa.ResourceManager):
-            PyVisa Resource Manager.
         address (str):
             PyVisa String e.g. "GPIB0::14::INSTR"
             with device location
@@ -21,7 +19,7 @@ class Tenma_72_2535(PowerSupply):
     Raises:
         None
     """
-    def __init__(self, resourceManager, address):
+    def __init__(self, address):
 
         channel1 = PowerSupplyChannel(
             channelNumber=1,
@@ -34,7 +32,6 @@ class Tenma_72_2535(PowerSupply):
         super().__init__(
             id="TENMA 72-2535 V2.1",
             name="Tenma 72-2535",
-            resourceManager=resourceManager,
             channelCount=1,
             channels=[channel1],
             hasOVP=True,
@@ -45,8 +42,6 @@ class Tenma_72_2535(PowerSupply):
             write_termination=None,
             timeout=500
         )
-
-        self.enable_channel_output(1, False)
 
     def read_id(self):
         """
@@ -80,9 +75,11 @@ class Tenma_72_2535(PowerSupply):
         while(1):
             try:
                 ret += (self.dev.read_bytes(1).decode("utf-8"))
-            except VisaIOError:
-                break
-        return ret
+            except VisaIOError as e:
+                if ret == "":
+                    raise e
+                else:
+                    return ret
 
     def _write(self, command):
         """
@@ -114,11 +111,12 @@ class Tenma_72_2535(PowerSupply):
             None
         """
         self._write(command)
+        sleep(0.2)
         return self._read()
 
     def set_channel_voltage(self, channelNumber, voltage):
         """
-        Attempts to set the voltage on channel <channelNumber>
+        Sets the voltage on channel <channelNumber>
         to <voltage> Volts
 
         Args:
@@ -129,10 +127,8 @@ class Tenma_72_2535(PowerSupply):
             None
 
         Raises:
-            AssertionError: If readback setpoint != voltage
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
         self._write(f"VSET{channelNumber}:{round(voltage, 2)}")
 
     def read_channel_voltage_setpoint(self, channelNumber):
@@ -147,10 +143,9 @@ class Tenma_72_2535(PowerSupply):
             float: Channel's voltage setpoint
 
         Raises:
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
-        return float(self._query(f"VSET{channelNumber}?"))
+        return float(self._query(f"VSET{channelNumber}?")[:5])
 
     def measure_channel_voltage(self, channelNumber):
         """
@@ -164,10 +159,9 @@ class Tenma_72_2535(PowerSupply):
             float: Channel's output voltage in Volts
 
         Raises:
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
-        return float(self._query(f"VOUT{channelNumber}?"))
+        return float(self._query(f"VOUT{channelNumber}?")[:5])
 
     def set_channel_current(self, channelNumber, current):
         """
@@ -182,9 +176,8 @@ class Tenma_72_2535(PowerSupply):
             None
 
         Raises:
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
         self._write(f"ISET{channelNumber}:{round(current, 3)}")
 
     def read_channel_current_setpoint(self, channelNumber):
@@ -199,9 +192,8 @@ class Tenma_72_2535(PowerSupply):
             float: Channel's current setpoint
 
         Raises:
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
         return float(self._query(f"ISET{channelNumber}?"))
 
     def measure_channel_current(self, channelNumber):
@@ -216,9 +208,8 @@ class Tenma_72_2535(PowerSupply):
             float: Channel's output current in Amps
 
         Raises:
-            ValueError: If channelNumber is not valid
+            None
         """
-        super().validate_channel_number(channelNumber)
         return float(self._query(f"IOUT{channelNumber}?"))
 
     def enable_channel_output(self, channelNumber, enabled):
@@ -235,5 +226,35 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             AssertionError: If enabled is not 0/1 or True/False
         """
-        super().validate_channel_number(channelNumber)
+        assert enabled in {True, False, 0, 1}
         self._write(f"OUT{1 if bool(enabled) else 0}")
+
+    def check_channel_errors(self, channelNumber):
+        """
+        Checks for errors on channel with output enabled
+        Errors are:
+            Output channel has become disabled due to error
+            Output channel is in constant current mode
+
+        Args:
+            channelNumber (int): Power Supply Channel Number
+
+        Returns:
+            bool: True if channel has errors
+
+        Raises:
+            None
+        """
+
+        # Get status byte and convert to string in reverse
+        # order so status[0] = bit 0
+        status = ord(self._query("STATUS?"))
+        status = format(status, '08b')[::-1]
+
+        # Only have one channel on this device
+        if(status[0] == '0' or status[6] == '0'):
+            # Device is either in constant current
+            # or output is disabled
+            return True
+        else:
+            return False

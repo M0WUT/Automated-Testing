@@ -12,7 +12,7 @@ def test_channel_count():
             name="x",
             resourceManager=rm,
             channelCount=1,
-            channels=[],
+            channels=[],  # ERROR
             hasOVP=0,
             hasOCP=0,
             address=None
