@@ -79,6 +79,52 @@ with InstrumentSupervisor() as tb:
         finally:
             tb.free_resouce(psu)
 
+    def test_set_invalid_voltage_limits(channel):
+        try:
+            with pytest.raises(ValueError):
+                channel.set_voltage_limits(-1, 1)  # ERROR
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_voltage_above_reduced_limits(channel):
+        try:
+            channel.set_voltage_limits(0, 1)
+            with pytest.raises(ValueError):
+                channel.set_voltage(2)
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_voltage_below_reduced_limits(channel):
+        try:
+            channel.set_voltage_limits(0.5, 1)
+            with pytest.raises(ValueError):
+                channel.set_voltage(0.2)
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_invalid_current_limits(channel):
+        try:
+            with pytest.raises(ValueError):
+                channel.set_current_limits(-1, 1)
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_current_above_reduced_limits(channel):
+        try:
+            channel.set_current_limits(0, 1)
+            with pytest.raises(ValueError):
+                channel.set_current(2)
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_current_below_reduced_limits(channel):
+        try:
+            channel.set_current_limits(0.5, 1)
+            with pytest.raises(ValueError):
+                channel.set_current(0.2)
+        finally:
+            tb.free_resouce(psu)
+
     def test_output_measure(channel):
         try:
             channel.set_voltage(1)

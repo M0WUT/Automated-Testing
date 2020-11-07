@@ -214,15 +214,21 @@ class PowerSupplyChannel():
 
         self.channelNumber = channelNumber
 
+        # Absolute max / min are limits fixed by instrument
+        # max / min include extra limits imposed externally
         if(maxVoltage < minVoltage):
             raise ValueError
-        self.maxVoltage = maxVoltage
-        self.minVoltage = minVoltage
+        self.absoluteMaxVoltage = maxVoltage
+        self.absoluteMinVoltage = minVoltage
+        self.maxVoltage = self.absoluteMaxVoltage
+        self.minVoltage = self.absoluteMinVoltage
 
         if(maxCurrent < minCurrent):
             raise ValueError
-        self.maxCurrent = maxCurrent
-        self.minCurrent = minCurrent
+        self.absoluteMaxCurrent = maxCurrent
+        self.absoluteMinCurrent = minCurrent
+        self.maxCurrent = self.absoluteMaxCurrent
+        self.minCurrent = self.absoluteMinCurrent
 
         self.ovpEnabled = False
         self.ocpEnabled = False
@@ -246,6 +252,74 @@ class PowerSupplyChannel():
             f"on {self.psu.name}"
         self.name = str(self.channelNumber)
         self.reserved = False
+        self.maxVoltage = self.absoluteMaxVoltage
+        self.minVoltage = self.absoluteMinVoltage
+        self.maxCurrent = self.absoluteMaxCurrent
+        self.minCurrent = self.absoluteMinCurrent
+
+    def set_voltage_limits(self, minVoltage, maxVoltage):
+        """
+        Allows tighter limits to be set on voltage than imposed by
+        the instrument.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested limits are outside
+                instrument limits
+        """
+        if(
+            (maxVoltage > self.absoluteMaxVoltage) or
+            (minVoltage < self.absoluteMinVoltage)
+        ):
+            logging.error(
+                f"PSU: {self.psu.name}, Channel {self.channelNumber} "
+                f"requested voltage limits ({minVoltage}V - {maxVoltage}V) "
+                f" are outside channel limits "
+                f"({self.absoluteMinVoltage}V - {self.absoluteMaxVoltage}V)"
+            )
+            raise ValueError
+
+        # We already know that requested limits are harsher / equal
+        # to instrument limits so just use those
+        self.maxVoltage = maxVoltage
+        self.minVoltage = minVoltage
+
+    def set_current_limits(self, minCurrent, maxCurrent):
+        """
+        Allows tighter limits to be set on current than imposed by
+        the instrument.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested limits are outside
+                instrument limits
+        """
+        if(
+            (maxCurrent > self.absoluteMaxCurrent) or
+            (minCurrent < self.absoluteMinCurrent)
+        ):
+            logging.error(
+                f"PSU: {self.psu.name}, Channel {self.channelNumber} "
+                f"requested current limits ({minCurrent}V - {maxCurrent}V) "
+                f" are outside channel limits "
+                f"({self.absoluteMinCurrent}V - {self.absoluteMaxCurrent}V)"
+            )
+            raise ValueError
+
+        # We already know that requested limits are harsher / equal
+        # to instrument limits so just use those
+        self.maxCurrent = maxCurrent
+        self.minCurrent = minCurrent
 
     def set_voltage(self, voltage):
         """
