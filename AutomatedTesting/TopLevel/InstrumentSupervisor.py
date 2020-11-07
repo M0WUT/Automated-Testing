@@ -47,12 +47,12 @@ class InstrumentSupervisor():
             None
         """
         for x in self.instruments:
-            self.free_resouce(x)
+            self.free_resource(x)
 
     def signal_handler(self, a, b):
         """
         Catches all signals indicating instrument faults
-        Shutdown is long enough that same error may be 
+        Shutdown is long enough that same error may be
         thrown during shutdown so only responds to the first
         one
 
@@ -88,7 +88,7 @@ class InstrumentSupervisor():
             x.initialise(self.resourceManager, self)
             self.instruments.append(x)
 
-    def free_resouce(self, instrument):
+    def free_resource(self, instrument):
         """
         Releases resources
 

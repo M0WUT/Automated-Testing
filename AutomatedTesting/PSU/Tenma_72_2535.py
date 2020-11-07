@@ -1,4 +1,4 @@
-from AutomatedTesting.PSU.psu import PowerSupply, PowerSupplyChannel
+from AutomatedTesting.PSU.PSU import PowerSupply, PowerSupplyChannel
 from pyvisa.errors import VisaIOError
 import logging
 
@@ -19,7 +19,7 @@ class Tenma_72_2535(PowerSupply):
     Raises:
         None
     """
-    def __init__(self, address):
+    def __init__(self, address, name="Tenma 72-2535"):
 
         channel1 = PowerSupplyChannel(
             channelNumber=1,
@@ -31,7 +31,7 @@ class Tenma_72_2535(PowerSupply):
 
         super().__init__(
             id="TENMA 72-2535 V2.1",
-            name="Tenma 72-2535",
+            name=name,
             channelCount=1,
             channels=[channel1],
             hasOVP=True,

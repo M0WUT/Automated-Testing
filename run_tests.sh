@@ -1,3 +1,3 @@
 #!/bin/bash
 source .venv/bin/activate
-pytest -v --cache-clear --flake8 --cov-report term-missing --cov=AutomatedTesting unit-tests/
+pytest --cov-report term-missing --cov=AutomatedTesting unit-tests/ --cache-clear --flake8 AutomatedTesting

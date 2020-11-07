@@ -1,5 +1,5 @@
 import pytest
-from AutomatedTesting.PSU.psu import PowerSupply, PowerSupplyChannel
+from AutomatedTesting.PSU.PSU import PowerSupply, PowerSupplyChannel
 import pyvisa
 
 rm = pyvisa.ResourceManager('@py')

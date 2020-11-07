@@ -13,4 +13,3 @@ class ProcessWithCleanStop():
 
     def start(self):
         self._process.start()
-

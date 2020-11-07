@@ -1,10 +1,11 @@
-from AutomatedTesting.TopLevel.BaseInstrument import BaseInstrument
+from AutomatedTesting.TopLevel.MultiChannelInstrument import \
+    MultiChannelInstrument
 from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from time import sleep
 import logging
 
 
-class PowerSupply(BaseInstrument):
+class PowerSupply(MultiChannelInstrument):
     """
     Pure virtual class for Power Supplies
     This should never be implemented directly
@@ -52,7 +53,7 @@ class PowerSupply(BaseInstrument):
 
         self.channels = channels
         for x in self.channels:
-            x.psu = self
+            x.instrument = self
             x.reserved = False
 
         self.channelCount = channelCount
@@ -100,74 +101,6 @@ class PowerSupply(BaseInstrument):
     def read_id(self):
         raise NotImplementedError  # pragma: no cover
 
-    def validate_channel_number(self, channelNumber):
-        """
-        Throws Error if channelNumber is invalid for that device
-
-        Args:
-            channelNumber (int): proposed Channel Number
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If Channel Number is not valid
-        """
-        if(
-            int(channelNumber) != channelNumber or
-            channelNumber < 0 or
-            channelNumber > self.channelCount
-        ):
-            raise ValueError(
-                f"Invalid channel number {channelNumber} for "
-                f"{self.name}"
-            )
-
-    def reserve_channel(self, channelNumber, name):
-        """
-        Marks PSU Channel as reserved and assigns a name to it
-
-        Args:
-            channelNumber (int): proposed Channel Number to reserve
-            name (str): name to identify channel purpose
-
-        Returns:
-            PowerSupplyChannel: the reserved channel
-
-        Raises:
-            AssertionError: If requested channel is already reserved
-        """
-        self.validate_channel_number(channelNumber)
-        assert self.channels[channelNumber - 1].reserved is False, \
-            f"Channel {channelNumber} on PSU {self.name} already " \
-            f"reserved for \"{self.channels[channelNumber - 1].name}\""
-
-        self.channels[channelNumber - 1].reserved = True
-        self.channels[channelNumber - 1].name = f"\"{name}\""
-        logging.info(
-            f"PSU: {self.name}, Channel {channelNumber} "
-            f"reserved for \"{name}\""
-        )
-        return self.channels[channelNumber - 1]
-
-    def cleanup(self):
-        """
-        Shuts down PSU cleanly
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        for x in self.channels:
-            x.cleanup()
-        super().cleanup()
-        logging.info(f"PSU: {self.name} Shutdown")
-
 
 class PowerSupplyChannel():
     """
@@ -186,7 +119,7 @@ class PowerSupplyChannel():
         reserved (bool): True if something has reserved control of this channel
         name (str): Name of the purpose that has this channel reserved
             None if self.reserved = False
-        errorThread (Thread): When output is enabled, checks every 100ms
+        errorThread (Thread): When output is enabled, checks to ensure
             that no errors have occured
 
     Returns:
@@ -206,7 +139,7 @@ class PowerSupplyChannel():
         minCurrent
     ):
 
-        self.psu = None
+        self.instrument = None
         self.reserved = False
         self.name = str(channelNumber)
         self.errorThread = None
@@ -249,7 +182,7 @@ class PowerSupplyChannel():
         """
         assert self.reserved is True, \
             f"Attempted to free unused channel {self.channelNumber} " \
-            f"on {self.psu.name}"
+            f"on {self.instrument.name}"
         self.name = str(self.channelNumber)
         self.reserved = False
         self.maxVoltage = self.absoluteMaxVoltage
@@ -277,7 +210,7 @@ class PowerSupplyChannel():
             (minVoltage < self.absoluteMinVoltage)
         ):
             logging.error(
-                f"PSU: {self.psu.name}, Channel {self.channelNumber} "
+                f"PSU: {self.instrument.name}, Channel {self.channelNumber} "
                 f"requested voltage limits ({minVoltage}V - {maxVoltage}V) "
                 f" are outside channel limits "
                 f"({self.absoluteMinVoltage}V - {self.absoluteMaxVoltage}V)"
@@ -309,7 +242,7 @@ class PowerSupplyChannel():
             (minCurrent < self.absoluteMinCurrent)
         ):
             logging.error(
-                f"PSU: {self.psu.name}, Channel {self.channelNumber} "
+                f"PSU: {self.instrument.name}, Channel {self.channelNumber} "
                 f"requested current limits ({minCurrent}V - {maxCurrent}V) "
                 f" are outside channel limits "
                 f"({self.absoluteMinCurrent}V - {self.absoluteMaxCurrent}V)"
@@ -337,23 +270,26 @@ class PowerSupplyChannel():
             AssertionError: If readback voltage != requested voltage
         """
         if(self.minVoltage <= voltage <= self.maxVoltage):
-            self.psu.set_channel_voltage(self.channelNumber, voltage)
+            self.instrument.set_channel_voltage(self.channelNumber, voltage)
             assert(self.read_voltage_setpoint() == voltage)
             if(self.outputEnabled):
                 sleep(0.1)
                 if self.measure_voltage() != voltage:
                     logging.error(
-                        f"PSU: {self.psu.name}, Channel {self.channelNumber}" \
+                        f"PSU: {self.instrument.name}, "
+                        f"Channel {self.channelNumber}"
                         f" is current limiting on turn on"
                     )
                     assert False
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name} set to {voltage}V"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name} set to {voltage}V"
             )
         else:
             raise ValueError(
                 f"Requested voltage of {voltage}V outside limits for "
-                f"Power supply {self.psu.name}, channel {self.channelNumber}"
+                f"Power supply {self.instrument.name}, "
+                f"channel {self.channelNumber}"
             )
 
     def read_voltage_setpoint(self):
@@ -369,7 +305,9 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.read_channel_voltage_setpoint(self.channelNumber)
+        return self.instrument.read_channel_voltage_setpoint(
+            self.channelNumber
+        )
 
     def measure_voltage(self):
         """
@@ -385,9 +323,10 @@ class PowerSupplyChannel():
             None
         """
 
-        x = self.psu.measure_channel_voltage(self.channelNumber)
+        x = self.instrument.measure_channel_voltage(self.channelNumber)
         logging.info(
-            f"PSU: {self.psu.name}, Channel {self.name} measured as to {x}V"
+            f"PSU: {self.instrument.name}, "
+            f"Channel {self.name} measured as to {x}V"
         )
         return x
 
@@ -407,17 +346,18 @@ class PowerSupplyChannel():
             AssertionError: If readback current != requested current
         """
         if(self.minCurrent <= current <= self.maxCurrent):
-            self.psu.set_channel_current(self.channelNumber, current)
+            self.instrument.set_channel_current(self.channelNumber, current)
             x = self.read_current_setpoint()
             assert(x == current)
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name} "
+                f"PSU: {self.instrument.name}, Channel {self.name} "
                 f"current limit set to {x}A"
             )
         else:
             raise ValueError(
                 f"Requested current of {current}A outside limits for "
-                f"Power supply {self.psu.name}, channel {self.channelNumber}"
+                f"Power supply {self.instrument.name}, "
+                f"channel {self.channelNumber}"
             )
 
     def read_current_setpoint(self):
@@ -433,7 +373,9 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.read_channel_current_setpoint(self.channelNumber)
+        return self.instrument.read_channel_current_setpoint(
+            self.channelNumber
+        )
 
     def measure_current(self):
         """
@@ -448,9 +390,9 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        x = self.psu.measure_channel_current(self.channelNumber)
+        x = self.instrument.measure_channel_current(self.channelNumber)
         logging.info(
-            f"PSU: {self.psu.name}, Channel {self.name} "
+            f"PSU: {self.instrument.name}, Channel {self.name} "
             f"current measured as {x}A"
         )
         return x
@@ -475,20 +417,22 @@ class PowerSupplyChannel():
         # protection has tripped
         if(self.errorThread is not None):
             if(enabled):
-                logging.ERROR(
-                    f"PSU: {self.psu.name}, Channel {self.name} "
+                logging.error(
+                    f"PSU: {self.instrument.name}, Channel {self.name} "
                     f"attempted to enable while already enabled"
                 )
+                raise ValueError
 
             self.errorThread.terminate()
             self.errorThread = None
 
-        self.psu.enable_channel_output(self.channelNumber, enabled)
+        self.instrument.enable_channel_output(self.channelNumber, enabled)
         self.outputEnabled = enabled
 
         if(enabled):
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: Output Enabled"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name}: Output Enabled"
             )
             self.errorThread = ProcessWithCleanStop(
                 target=self.check_for_errors
@@ -497,7 +441,8 @@ class PowerSupplyChannel():
             self.errorThread.start()
         else:
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: Output Disabled"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name}: Output Disabled"
             )
 
     def enable_ovp(self, enabled):
@@ -513,16 +458,18 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        self.psu.enable_channel_ovp(self.channelNumber, enabled)
+        self.instrument.enable_channel_ovp(self.channelNumber, enabled)
         self.ovpEnabled = enabled
 
         if enabled:
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: OVP Enabled"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name}: OVP Enabled"
             )
         else:
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: OVP Disabled"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name}: OVP Disabled"
             )
 
     def enable_ocp(self, enabled):
@@ -538,16 +485,18 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        self.psu.enable_channel_ocp(self.channelNumber, enabled)
+        self.instrument.enable_channel_ocp(self.channelNumber, enabled)
         self.ocpEnabled = enabled
 
         if enabled:
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: OCP Enabled"
+                f"PSU: {self.instrument.name}, f"
+                f"Channel {self.name}: OCP Enabled"
             )
         else:
             logging.info(
-                f"PSU: {self.psu.name}, Channel {self.name}: OCP Disabled"
+                f"PSU: {self.instrument.name}, "
+                f"Channel {self.name}: OCP Disabled"
             )
 
     def check_for_errors(self, event):
@@ -566,9 +515,9 @@ class PowerSupplyChannel():
             None
         """
         while not event.is_set() and self.error is False:
-            if self.psu.check_channel_errors(self.channelNumber) is True:
+            if self.instrument.check_channel_errors(self.channelNumber):
                 self.error = True
-                self.psu.supervisor.handle_instrument_error()
+                self.instrument.supervisor.handle_instrument_error()
 
     def cleanup(self):
         if self.errorThread is not None:
@@ -578,4 +527,6 @@ class PowerSupplyChannel():
         if(self.reserved):
             self._free()
 
-        logging.info(f"PSU: {self.psu.name}, Channel {self.name} shutdown")
+        logging.info(
+            f"PSU: {self.instrument.name}, Channel {self.name} shutdown"
+        )
