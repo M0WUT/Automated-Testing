@@ -11,4 +11,8 @@ with InstrumentSupervisor(loggingLevel=logging.INFO) as supervisor:
     channel.enable_output(True)
     assert channel.measure_voltage() == 1
     assert channel.measure_current() == 0
-    sleep(2)
+    channel.set_voltage(2)
+
+    # Wait to ensure monitoring thread runs
+    sleep(4)
+    channel.enable_output(False)

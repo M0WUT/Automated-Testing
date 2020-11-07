@@ -68,6 +68,8 @@ class PowerSupply(BaseInstrument):
     def initialise(self, resourceManager, supervisor):
         super().initialise(resourceManager, supervisor)
         for x in self.channels:
+            x.enable_ovp(False)
+            x.enable_ocp(False)
             x.enable_output(False)
         logging.info(f"PSU: {self.name} initialised")
 
@@ -392,6 +394,21 @@ class PowerSupplyChannel():
         Raises:
             None
         """
+
+        # If we're turning off the output, disable the monitoring thread
+        # Otherwise there's a race condition in shutdown where the output
+        # is disabled before the monitor thread finished and it thinks the
+        # protection has tripped
+        if(self.errorThread is not None):
+            if(enabled):
+                logging.ERROR(
+                    f"PSU: {self.psu.name}, Channel {self.name} "
+                    f"attempted to enable while already enabled"
+                )
+
+            self.errorThread.terminate()
+            self.errorThread = None
+
         self.psu.enable_channel_output(self.channelNumber, enabled)
         self.outputEnabled = enabled
 
@@ -402,14 +419,62 @@ class PowerSupplyChannel():
             self.errorThread = ProcessWithCleanStop(
                 target=self.check_for_errors
             )
+            sleep(0.5)  # Allow a small amount of time for inrush current
             self.errorThread.start()
         else:
             logging.info(
                 f"PSU: {self.psu.name}, Channel {self.name}: Output Disabled"
             )
-            if(self.errorThread is not None):
-                self.errorThread.terminate()
-                self.errorThread = None
+
+    def enable_ovp(self, enabled):
+        """
+        Enables / Disables channel Overvoltage proection
+
+        Args:
+            enabled (bool): 0/False = Disable output, 1/True = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.psu.enable_channel_ovp(self.channelNumber, enabled)
+        self.ovpEnabled = enabled
+
+        if enabled:
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: OVP Enabled"
+            )
+        else:
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: OVP Disabled"
+            )
+
+    def enable_ocp(self, enabled):
+        """
+        Enables / Disables channel Overcurrent proection
+
+        Args:
+            enabled (bool): 0/False = Disable output, 1/True = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.psu.enable_channel_ocp(self.channelNumber, enabled)
+        self.ocpEnabled = enabled
+
+        if enabled:
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: OCP Enabled"
+            )
+        else:
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: OCP Disabled"
+            )
 
     def check_for_errors(self, event):
         """

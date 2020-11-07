@@ -35,6 +35,22 @@ with InstrumentSupervisor() as tb:
         finally:
             tb.free_resouce(psu)
 
+    def test_set_ovp(channel):
+        try:
+            channel.enable_ovp(True)
+            sleep(0.5)
+            channel.enable_ovp(False)
+        finally:
+            tb.free_resouce(psu)
+
+    def test_set_ocp(channel):
+        try:
+            channel.enable_ocp(True)
+            sleep(0.5)
+            channel.enable_ocp(False)
+        finally:
+            tb.free_resouce(psu)
+
     def test_set_high_invalid_voltage(channel):
         try:
             with pytest.raises(ValueError):
@@ -84,5 +100,7 @@ with InstrumentSupervisor() as tb:
 
             # Wait to ensure monitoring thread runs
             sleep(4)
+            channel.enable_output(False)
+
         finally:
             tb.free_resouce(psu)

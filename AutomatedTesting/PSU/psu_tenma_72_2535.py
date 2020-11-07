@@ -205,6 +205,49 @@ class Tenma_72_2535(PowerSupply):
             acquireLock=True
         )
 
+    def enable_channel_ovp(self, channelNumber, enabled):
+        """
+        Enables / Disables channel Overvoltage protection
+
+        Args:
+            channelNumber (int): Power Supply Channel Number
+            enabled (bool): 0 = Disable output, 1 = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If enabled is not 0/1 or True/False
+        """
+
+        # This PSU only has one channel so this is set globally
+        assert enabled in {True, False, 0, 1}
+        self._write(
+            f"OVP{1 if bool(enabled) else 0}",
+            acquireLock=True
+        )
+
+    def enable_channel_ocp(self, channelNumber, enabled):
+        """
+        Enables / Disables channel Overcurrent protection
+
+        Args:
+            channelNumber (int): Power Supply Channel Number
+            enabled (bool): 0 = Disable output, 1 = Enable output
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If enabled is not 0/1 or True/False
+        """
+        # This PSU only has one channel so this is set globally
+        assert enabled in {True, False, 0, 1}
+        self._write(
+            f"OCP{1 if bool(enabled) else 0}",
+            acquireLock=True
+        )
+
     def check_channel_errors(self, channelNumber):
         """
         Checks for errors on channel with output enabled
