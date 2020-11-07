@@ -1,6 +1,6 @@
 from AutomatedTesting.PSU.psu import PowerSupply, PowerSupplyChannel
 from pyvisa.errors import VisaIOError
-from time import sleep
+import logging
 
 
 class Tenma_72_2535(PowerSupply):
@@ -81,39 +81,6 @@ class Tenma_72_2535(PowerSupply):
                 else:
                     return ret
 
-    def _write(self, command):
-        """
-        Writes Data to PSU - needs sleep otherwise data gets dropped
-
-        Args:
-            command (str): Command to send
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        sleep(0.1)
-        self.dev.write(command)
-
-    def _query(self, command):
-        """
-        Sends command and returns response
-
-        Args:
-            command (str): Command to send
-
-        Returns:
-            str: Response from PSU
-
-        Raises:
-            None
-        """
-        self._write(command)
-        sleep(0.2)
-        return self._read()
-
     def set_channel_voltage(self, channelNumber, voltage):
         """
         Sets the voltage on channel <channelNumber>
@@ -129,7 +96,10 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        self._write(f"VSET{channelNumber}:{round(voltage, 2)}")
+        self._write(
+            f"VSET{channelNumber}:{round(voltage, 2)}",
+            acquireLock=True
+        )
 
     def read_channel_voltage_setpoint(self, channelNumber):
         """
@@ -145,7 +115,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VSET{channelNumber}?")[:5])
+        return float(self._query(f"VSET{channelNumber}?"))
 
     def measure_channel_voltage(self, channelNumber):
         """
@@ -161,7 +131,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VOUT{channelNumber}?")[:5])
+        return float(self._query(f"VOUT{channelNumber}?"))
 
     def set_channel_current(self, channelNumber, current):
         """
@@ -178,7 +148,10 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        self._write(f"ISET{channelNumber}:{round(current, 3)}")
+        self._write(
+            f"ISET{channelNumber}:{round(current, 3)}",
+            acquireLock=True
+        )
 
     def read_channel_current_setpoint(self, channelNumber):
         """
@@ -227,7 +200,10 @@ class Tenma_72_2535(PowerSupply):
             AssertionError: If enabled is not 0/1 or True/False
         """
         assert enabled in {True, False, 0, 1}
-        self._write(f"OUT{1 if bool(enabled) else 0}")
+        self._write(
+            f"OUT{1 if bool(enabled) else 0}",
+            acquireLock=True
+        )
 
     def check_channel_errors(self, channelNumber):
         """
@@ -252,9 +228,19 @@ class Tenma_72_2535(PowerSupply):
         status = format(status, '08b')[::-1]
 
         # Only have one channel on this device
-        if(status[0] == '0' or status[6] == '0'):
-            # Device is either in constant current
-            # or output is disabled
+        if(status[0] == '0'):
+            logging.error(
+                f"PSU: {self.name}, "
+                f"Channel {self.channels[channelNumber - 1].name} "
+                "is current limiting"
+            )
+            return True
+        elif (status[6] == '0'):
+            logging.error(
+                f"PSU: {self.name}, "
+                f"Channel {self.channels[channelNumber - 1].name} "
+                "has tripped protection circuitry"
+            )
             return True
         else:
             return False

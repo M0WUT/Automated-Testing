@@ -1,23 +1,18 @@
 import pyvisa
 import os
 import signal
-
-
-def signal_handler(a, b):
-    assert False
-
-
-signal.signal(signal.SIGUSR1, signal_handler)
+import sys
+import logging
 
 
 class InstrumentSupervisor():
-    def __init__(self):
+    def __init__(self, loggingLevel=logging.WARNING):
         """
         All test scripts should be implmented as a class which inherits this.
         Implements all the setup / cleanup and error handling
 
         Args:
-            None
+            loggingLevel: level of detail which should be logged
 
         Returns:
             None
@@ -26,8 +21,14 @@ class InstrumentSupervisor():
             None
         """
         self.instruments = []
+        logging.basicConfig(
+            format='%(levelname)s: %(asctime)s %(message)s',
+            level=loggingLevel
+        )
         self.resourceManager = pyvisa.ResourceManager('@py')
         self.mainThread = os.getpid()
+        self.shutdown = False
+        signal.signal(signal.SIGUSR1, self.signal_handler)
 
     def __enter__(self):
         return self
@@ -47,6 +48,28 @@ class InstrumentSupervisor():
         """
         for x in self.instruments:
             self.free_resouce(x)
+
+    def signal_handler(self, a, b):
+        """
+        Catches all signals indicating instrument faults
+        Shutdown is long enough that same error may be 
+        thrown during shutdown so only responds to the first
+        one
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        if self.shutdown is False:
+            self.shutdown = True
+            sys.exit(1)
+        else:
+            pass
 
     def request_resources(self, instruments):
         """
@@ -86,10 +109,10 @@ class InstrumentSupervisor():
     def handle_instrument_error(self):
         """
         Called by monitoring thread if instrument has error while active.
-        Passes signal to main thread indicating it should shutdown
+        Passes signal to main thread on the first fault encountered
 
         Args:
-            None
+           None
 
         Returns:
             None

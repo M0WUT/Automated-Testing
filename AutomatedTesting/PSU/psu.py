@@ -1,7 +1,7 @@
 from AutomatedTesting.TopLevel.BaseInstrument import BaseInstrument
-from multiprocessing import Process
+from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from time import sleep
-import signal
+import logging
 
 
 class PowerSupply(BaseInstrument):
@@ -69,6 +69,7 @@ class PowerSupply(BaseInstrument):
         super().initialise(resourceManager, supervisor)
         for x in self.channels:
             x.enable_output(False)
+        logging.info(f"PSU: {self.name} initialised")
 
     def set_channel_voltage(self, channelNumber, voltage):
         raise NotImplementedError  # pragma: no cover
@@ -140,9 +141,9 @@ class PowerSupply(BaseInstrument):
             f"reserved for \"{self.channels[channelNumber - 1].name}\""
 
         self.channels[channelNumber - 1].reserved = True
-        self.channels[channelNumber - 1].name = name
-        print(
-            f"Channel {channelNumber} on PSU {self.name} "
+        self.channels[channelNumber - 1].name = f"\"{name}\""
+        logging.info(
+            f"PSU: {self.name}, Channel {channelNumber} "
             f"reserved for \"{name}\""
         )
         return self.channels[channelNumber - 1]
@@ -163,6 +164,7 @@ class PowerSupply(BaseInstrument):
         for x in self.channels:
             x.cleanup()
         super().cleanup()
+        logging.info(f"PSU: {self.name} Shutdown")
 
 
 class PowerSupplyChannel():
@@ -204,8 +206,9 @@ class PowerSupplyChannel():
 
         self.psu = None
         self.reserved = False
-        self.name = None
+        self.name = str(channelNumber)
         self.errorThread = None
+        self.error = False
 
         self.channelNumber = channelNumber
 
@@ -239,7 +242,7 @@ class PowerSupplyChannel():
         assert self.reserved is True, \
             f"Attempted to free unused channel {self.channelNumber} " \
             f"on {self.psu.name}"
-        self.name = None
+        self.name = str(self.channelNumber)
         self.reserved = False
 
     def set_voltage(self, voltage):
@@ -262,9 +265,15 @@ class PowerSupplyChannel():
             assert(self.read_voltage_setpoint() == voltage)
             if(self.outputEnabled):
                 sleep(0.1)
-                assert self.measure_voltage() == voltage, \
-                    f"Channel {self.channelNumber} on PSU {self.psu.name}" \
-                    f" is current limiting"
+                if self.measure_voltage() != voltage:
+                    logging.error(
+                        f"PSU: {self.psu.name}, Channel {self.channelNumber}" \
+                        f" is current limiting on turn on"
+                    )
+                    assert False
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name} set to {voltage}V"
+            )
         else:
             raise ValueError(
                 f"Requested voltage of {voltage}V outside limits for "
@@ -299,7 +308,12 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.measure_channel_voltage(self.channelNumber)
+
+        x = self.psu.measure_channel_voltage(self.channelNumber)
+        logging.info(
+            f"PSU: {self.psu.name}, Channel {self.name} measured as to {x}V"
+        )
+        return x
 
     def set_current(self, current):
         """
@@ -320,6 +334,10 @@ class PowerSupplyChannel():
             self.psu.set_channel_current(self.channelNumber, current)
             x = self.read_current_setpoint()
             assert(x == current)
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name} "
+                f"current limit set to {x}A"
+            )
         else:
             raise ValueError(
                 f"Requested current of {current}A outside limits for "
@@ -354,7 +372,12 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        return self.psu.measure_channel_current(self.channelNumber)
+        x = self.psu.measure_channel_current(self.channelNumber)
+        logging.info(
+            f"PSU: {self.psu.name}, Channel {self.name} "
+            f"current measured as {x}A"
+        )
+        return x
 
     def enable_output(self, enabled):
         """
@@ -371,24 +394,31 @@ class PowerSupplyChannel():
         """
         self.psu.enable_channel_output(self.channelNumber, enabled)
         self.outputEnabled = enabled
+
         if(enabled):
-            self.errorThread = Process(
-                target=self.check_for_errors,
-                daemon=True
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: Output Enabled"
+            )
+            self.errorThread = ProcessWithCleanStop(
+                target=self.check_for_errors
             )
             self.errorThread.start()
         else:
+            logging.info(
+                f"PSU: {self.psu.name}, Channel {self.name}: Output Disabled"
+            )
             if(self.errorThread is not None):
                 self.errorThread.terminate()
                 self.errorThread = None
 
-    def check_for_errors(self):
+    def check_for_errors(self, event):
         """
         Checks that channel with output enabled has no errors attached to it
         This is blocking so should only be called within a separate thread
 
         Args:
-            None
+            event (multiprocessing.Event): Thread will terminate cleanly
+                when this is set
 
         Returns:
             None
@@ -396,14 +426,17 @@ class PowerSupplyChannel():
         Raises:
             None
         """
-        while(1):
-            sleep(2)
+        while not event.is_set() and self.error is False:
             if self.psu.check_channel_errors(self.channelNumber) is True:
+                self.error = True
                 self.psu.supervisor.handle_instrument_error()
 
     def cleanup(self):
         if self.errorThread is not None:
             self.errorThread.terminate()
+            self.errorThread = None
         self.enable_output(False)
         if(self.reserved):
             self._free()
+
+        logging.info(f"PSU: {self.psu.name}, Channel {self.name} shutdown")

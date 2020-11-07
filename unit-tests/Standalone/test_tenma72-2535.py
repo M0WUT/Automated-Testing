@@ -1,6 +1,7 @@
 from AutomatedTesting.TopLevel.config import tenmaSingleChannel as psu
 from AutomatedTesting.TopLevel.InstrumentSupervisor import InstrumentSupervisor
 import pytest
+from time import sleep
 
 with InstrumentSupervisor() as tb:
 
@@ -69,7 +70,6 @@ with InstrumentSupervisor() as tb:
             channel.enable_output(True)
             assert channel.measure_voltage() == 1
             assert channel.measure_current() == 0
-            channel.enable_output(False)
         finally:
             tb.free_resouce(psu)
 
@@ -81,6 +81,8 @@ with InstrumentSupervisor() as tb:
             assert channel.measure_voltage() == 1
             assert channel.measure_current() == 0
             channel.set_voltage(2)
-            channel.enable_output(False)
+
+            # Wait to ensure monitoring thread runs
+            sleep(4)
         finally:
             tb.free_resouce(psu)

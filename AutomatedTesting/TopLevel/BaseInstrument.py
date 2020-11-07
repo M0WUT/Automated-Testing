@@ -1,5 +1,7 @@
 import pyvisa
 from AutomatedTesting.TopLevel.InstrumentSupervisor import InstrumentSupervisor
+from multiprocessing import Lock
+from time import sleep
 
 
 class BaseInstrument():
@@ -26,6 +28,7 @@ class BaseInstrument():
         self.address = address
         self.kwargs = kwargs
         self.dev = None
+        self.lock = Lock()
 
     def initialise(self, resourceManager, supervisor):
         """
@@ -59,6 +62,71 @@ class BaseInstrument():
 
     def read_id(self):
         raise NotImplementedError  # pragma: no cover
+
+    def _write(self, command, acquireLock=False):
+        """
+        Writes Data to Instrument - needs sleep otherwise data gets dropped
+        in some cases
+
+        Args:
+            command (str): Command to send
+            acquireLock:
+                True: Executing a pure write command and need to acquire lock
+                False: Write is part of a query (combined write/read)
+                    and does not need to acquire lock
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        sleep(0.1)
+        if(acquireLock):
+            try:
+                self.lock.acquire()
+                self.dev.write(command)
+            finally:
+                self.lock.release()
+        else:
+            self.dev.write(command)
+
+    def _read(self):
+        """
+        Reads a single respone (until \n or message end)
+        Doesn't acquire lock as normally just a part
+        of a query which handles locking
+
+        Args:
+            None
+
+        Returns:
+            str: Response from Instrument
+
+        Raises:
+            None
+        """
+        return self.dev.read()
+
+    def _query(self, command):
+        """
+        Sends command and returns response
+
+        Args:
+            command (str): Command to send
+
+        Returns:
+            str: Response from Instrument
+
+        Raises:
+            None
+        """
+        try:
+            self.lock.acquire()
+            self._write(command)
+            return self._read()
+        finally:
+            self.lock.release()
 
     def cleanup(self):
         self.dev.close()
