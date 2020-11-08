@@ -3,8 +3,28 @@ import logging
 
 
 class MultiChannelInstrument(BaseInstrument):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+            self,
+            address,
+            id,
+            name,
+            channelCount,
+            channels,
+            *args,
+            **kwargs
+    ):
+        assert len(channels) == channelCount
+        expectedChannels = list(range(1, channelCount + 1))
+        foundChannels = [x.channelNumber for x in channels]
+        assert expectedChannels == foundChannels
+
+        self.channels = channels
+        for x in self.channels:
+            x.instrument = self
+            x.reserved = False
+
+            self.channelCount = channelCount
+            super().__init__(address, id, name, *args, **kwargs)
 
     def validate_channel_number(self, channelNumber):
         """
@@ -51,7 +71,7 @@ class MultiChannelInstrument(BaseInstrument):
         self.channels[channelNumber - 1].reserved = True
         self.channels[channelNumber - 1].name = f"\"{name}\""
         logging.info(
-            f"Instrument: {self.name}, Channel {channelNumber} "
+            f"{self.name}, Channel {channelNumber} "
             f"reserved for \"{name}\""
         )
         return self.channels[channelNumber - 1]
@@ -72,4 +92,4 @@ class MultiChannelInstrument(BaseInstrument):
         for x in self.channels:
             x.cleanup()
         super().cleanup()
-        logging.info(f"Instrument: {self.name} Shutdown")
+        logging.info(f"{self.name} Shutdown")

@@ -33,36 +33,28 @@ class PowerSupply(MultiChannelInstrument):
     """
     def __init__(
         self,
+        address,
         id,
         name,
         channelCount,
         channels,
         hasOVP,
         hasOCP,
-        address,
         **kwargs
     ):
-        self.id = id
-        self.name = name
+
         # Check that we have a continous list of channels from
         # ID = 1 -> channelCount
-        assert len(channels) == channelCount
-        expectedChannels = list(range(1, channelCount + 1))
-        foundChannels = [x.channelNumber for x in channels]
-        assert expectedChannels == foundChannels
 
-        self.channels = channels
-        for x in self.channels:
-            x.instrument = self
-            x.reserved = False
-
-        self.channelCount = channelCount
         self.hasOVP = hasOVP
         self.hasOCP = hasOCP
-        self.supervisor = None
 
         super().__init__(
             address,
+            id,
+            name,
+            channelCount,
+            channels,
             **kwargs
         )
 
@@ -72,6 +64,8 @@ class PowerSupply(MultiChannelInstrument):
             x.enable_ovp(False)
             x.enable_ocp(False)
             x.enable_output(False)
+            x.set_voltage(x.minVoltage)
+            x.set_current(x.minCurrent)
         logging.info(f"PSU: {self.name} initialised")
 
     def set_channel_voltage(self, channelNumber, voltage):
@@ -96,9 +90,6 @@ class PowerSupply(MultiChannelInstrument):
         raise NotImplementedError  # pragma: no cover
 
     def check_channel_errors(self, channelNumber):
-        raise NotImplementedError  # pragma: no cover
-
-    def read_id(self):
         raise NotImplementedError  # pragma: no cover
 
 
@@ -289,7 +280,7 @@ class PowerSupplyChannel():
             raise ValueError(
                 f"Requested voltage of {voltage}V outside limits for "
                 f"Power supply {self.instrument.name}, "
-                f"channel {self.channelNumber}"
+                f"Channel {self.channelNumber}"
             )
 
     def read_voltage_setpoint(self):

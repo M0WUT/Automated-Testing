@@ -3,6 +3,7 @@ from AutomatedTesting.TopLevel.MultiChannelInstrument import \
 from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from time import sleep
 import logging
+from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
 
 class SignalGeneratorChannel():
@@ -30,7 +31,6 @@ class SignalGeneratorChannel():
         None
 
     Raises:
-        TypeError: If psu is not a SignalGenerator or None
         ValueError: If Max Power < Min Power, Max Freq < Min Freq
             or channelNumber > max channels for that Signal Generator
     """
@@ -43,16 +43,13 @@ class SignalGeneratorChannel():
         minFreq
     ):
 
-        self.psu = None
+        self.instrument = None
         self.reserved = False
         self.name = str(channelNumber)
         self.errorThread = None
         self.error = False
-
         self.channelNumber = channelNumber
 
-        # Absolute max / min are limits fixed by instrument
-        # max / min include extra limits imposed externally
         if(maxPower < minPower):
             raise ValueError
         self.absoluteMaxPower = maxPower
@@ -114,7 +111,7 @@ class SignalGeneratorChannel():
             (minPower < self.absoluteMinPower)
         ):
             logging.error(
-                f"Signal Generator: {self.sigGen.name}, "
+                f"{self.instrument.name}, "
                 f"Channel {self.channelNumber} "
                 f"requested power limits ({minPower}dBm - {maxPower}dBm) "
                 f" are outside channel limits "
@@ -147,11 +144,13 @@ class SignalGeneratorChannel():
             (minFreq < self.absoluteMinFreq)
         ):
             logging.error(
-                f"Signal Generator: {self.sigGen.name}, "
+                f"{self.instrument.name}, "
                 f"Channel {self.channelNumber} "
-                f"requested frequency limits ({minFreq}Hz - {maxFreq}Hz) "
+                f"requested frequency limits ({readable_freq(minFreq)} - "
+                f"{readable_freq(maxFreq)}) "
                 f" are outside channel limits "
-                f"({self.absoluteMinFreq}Hz - {self.absoluteMaxFreq}Hz)"
+                f"({readable_freq(self.absoluteMinFreq)} - "
+                f"{readable_freq(self.absoluteMaxFreq)})"
             )
             raise ValueError
 
@@ -181,7 +180,7 @@ class SignalGeneratorChannel():
         if(self.errorThread is not None):
             if(enabled):
                 logging.error(
-                    f"Signal Generator: {self.sigGen.name}, "
+                    f"{self.instrument.name}, "
                     f"Channel {self.name} "
                     f"attempted to enable while already enabled"
                 )
@@ -190,12 +189,12 @@ class SignalGeneratorChannel():
             self.errorThread.terminate()
             self.errorThread = None
 
-        self.sigGen.enable_channel_output(self.channelNumber, enabled)
+        self.instrument.enable_channel_output(self.channelNumber, enabled)
         self.outputEnabled = enabled
 
         if(enabled):
-            logging.info(
-                f"Signal Generator: {self.sigGen.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: Output Enabled"
             )
             self.errorThread = ProcessWithCleanStop(
@@ -204,8 +203,8 @@ class SignalGeneratorChannel():
             sleep(0.5)  # Allow a small amount of time for inrush current
             self.errorThread.start()
         else:
-            logging.info(
-                f"Signal Generator: {self.sigGen.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: Output Disabled"
             )
 
@@ -225,11 +224,25 @@ class SignalGeneratorChannel():
             None
         """
         while not event.is_set() and self.error is False:
-            if self.psu.check_channel_errors(self.channelNumber):
+            if self.instrument.check_channel_errors(self.channelNumber):
                 self.error = True
-                self.psu.supervisor.handle_instrument_error()
+                self.instrument.supervisor.handle_instrument_error()
 
     def cleanup(self):
+        """
+        Disables channel output, removes reservation on channel and
+        shutdowns the monitoring thread so channel is ready for
+        shutdown
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         if self.errorThread is not None:
             self.errorThread.terminate()
             self.errorThread = None
@@ -238,8 +251,115 @@ class SignalGeneratorChannel():
             self._free()
 
         logging.info(
-            f"Signal Generator: {self.sigGen.name}, "
+            f"{self.instrument.name}, "
             f"Channel {self.name} shutdown"
+        )
+
+    def set_power(self, power):
+        """
+        Sets channel output power
+
+        Args:
+            power (float): desired output power in dBm
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested power is outside channel
+                max/min power
+            AssertionError: If readback power != requested power
+        """
+        if(self.minPower <= power <= self.maxPower):
+            self.instrument.set_channel_power(self.channelNumber, power)
+            x = self.read_power()
+            if(x != power):
+                logging.error(
+                    f"{self.instrument.name}, "
+                    f"Channel {self.name} failed to set power to "
+                    f"{power}dBm. Readback value: {x}dBm"
+                )
+
+            logging.debug(
+                f"{self.instrument.name}, "
+                f"{self.name} set to {power}dBm"
+            )
+        else:
+            raise ValueError(
+                f"Requested power of {power}dBm outside limits for "
+                f"{self.instrument.name}, "
+                f"Channel {self.channelNumber}"
+            )
+
+    def read_power(self):
+        """
+        Reads channel output power
+
+        Args:
+            None
+
+        Returns:
+            power (float): channel output power in dBm
+
+        Raises:
+            None
+        """
+        return self.instrument.read_channel_power(
+            self.channelNumber
+        )
+
+    def set_freq(self, freq):
+        """
+        Sets channel carrier frequency
+
+        Args:
+            freq (float): frequency in Hz
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested frequency is outside channel
+                max/min frequency
+            AssertionError: If readback frequency != requested frequency
+        """
+        if(self.minFreq <= freq <= self.maxFreq):
+            self.instrument.set_channel_freq(self.channelNumber, freq)
+            x = self.read_freq()
+            if(x != freq):
+                logging.error(
+                    f"{self.instrument.name}, "
+                    f"Channel {self.name} failed to set frequency to "
+                    f"{readable_freq(freq)}. "
+                    f"Readback value: {readable_freq(x)}"
+                )
+
+            logging.debug(
+                f"{self.instrument.name}, "
+                f"Channel {self.name} set to {readable_freq(freq)}"
+            )
+        else:
+            raise ValueError(
+                f"Requested freq of {readable_freq(freq)} outside limits for "
+                f"{self.instrument.name}, "
+                f"Channel {self.channelNumber}"
+            )
+
+    def read_freq(self):
+        """
+        Reads channel output power
+
+        Args:
+            None
+
+        Returns:
+            power (float): channel output power in dBm
+
+        Raises:
+            None
+        """
+        return self.instrument.read_channel_freq(
+            self.channelNumber
         )
 
 
@@ -277,30 +397,41 @@ class SignalGenerator(MultiChannelInstrument):
         address,
         **kwargs
     ):
-        self.id = id
-        self.name = name
-        # Check that we have a continous list of channels from
-        # ID = 1 -> channelCount
-        assert len(channels) == channelCount
-        expectedChannels = list(range(1, channelCount + 1))
-        foundChannels = [x.channelNumber for x in channels]
-        assert expectedChannels == foundChannels
-
-        self.channels = channels
-        for x in self.channels:
-            x.sigGen = self
-            x.reserved = False
-
-        self.channelCount = channelCount
-        self.supervisor = None
-
         super().__init__(
             address,
+            id,
+            name,
+            channelCount,
+            channels,
             **kwargs
         )
+
+    def initialise(self, resourceManager, supervisor):
+        super().initialise(resourceManager, supervisor)
+        for x in self.channels:
+            x.enable_output(False)
+        logging.info(f"{self.name} initialised")
 
     def enable_channel_output(self, channelNumber, enabled):
         raise NotImplementedError  # pragma: no cover
 
     def check_channel_errors(self, channelNumber):
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_power(self, channelNumber, power):
+        raise NotImplementedError  # pragma: no cover
+
+    def read_channel_power(self, channelNumber):
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_freq(self, channelNumber, freq):
+        raise NotImplementedError  # pragma: no cover
+
+    def read_channel_freq(self, channelNumber):
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_modulation(self, channelNumber, modulation):
+        raise NotImplementedError  # pragma: no cover
+
+    def read_channel_modulation(self, channelNumber):
         raise NotImplementedError  # pragma: no cover

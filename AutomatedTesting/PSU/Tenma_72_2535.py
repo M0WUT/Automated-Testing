@@ -30,33 +30,34 @@ class Tenma_72_2535(PowerSupply):
         )
 
         super().__init__(
+            address=address,
             id="TENMA 72-2535 V2.1",
             name=name,
             channelCount=1,
             channels=[channel1],
             hasOVP=True,
             hasOCP=True,
-            address=address,
             baud_rate=9600,
             read_termination=None,
             write_termination=None,
             timeout=500
         )
 
-    def read_id(self):
+    def reset(self):
         """
-        Queries PSU Device ID
+        This PSU has no reset functionality so override default
+        and do nothing
 
         Args:
             None
 
         Returns:
-            str: Device ID String
+            None
 
         Raises:
             None
         """
-        return self._query("*IDN?")
+        pass
 
     def _read(self):
         """
@@ -96,10 +97,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        self._write(
-            f"VSET{channelNumber}:{round(voltage, 2)}",
-            acquireLock=True
-        )
+        self._write(f"VSET{channelNumber}:{round(voltage, 2)}")
 
     def read_channel_voltage_setpoint(self, channelNumber):
         """
@@ -148,10 +146,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        self._write(
-            f"ISET{channelNumber}:{round(current, 3)}",
-            acquireLock=True
-        )
+        self._write(f"ISET{channelNumber}:{round(current, 3)}")
 
     def read_channel_current_setpoint(self, channelNumber):
         """
@@ -200,10 +195,7 @@ class Tenma_72_2535(PowerSupply):
             AssertionError: If enabled is not 0/1 or True/False
         """
         assert enabled in {True, False, 0, 1}
-        self._write(
-            f"OUT{1 if bool(enabled) else 0}",
-            acquireLock=True
-        )
+        self._write(f"OUT{1 if bool(enabled) else 0}")
 
     def enable_channel_ovp(self, channelNumber, enabled):
         """
@@ -222,10 +214,7 @@ class Tenma_72_2535(PowerSupply):
 
         # This PSU only has one channel so this is set globally
         assert enabled in {True, False, 0, 1}
-        self._write(
-            f"OVP{1 if bool(enabled) else 0}",
-            acquireLock=True
-        )
+        self._write(f"OVP{1 if bool(enabled) else 0}")
 
     def enable_channel_ocp(self, channelNumber, enabled):
         """
@@ -243,10 +232,7 @@ class Tenma_72_2535(PowerSupply):
         """
         # This PSU only has one channel so this is set globally
         assert enabled in {True, False, 0, 1}
-        self._write(
-            f"OCP{1 if bool(enabled) else 0}",
-            acquireLock=True
-        )
+        self._write(f"OCP{1 if bool(enabled) else 0}")
 
     def check_channel_errors(self, channelNumber):
         """
@@ -287,3 +273,20 @@ class Tenma_72_2535(PowerSupply):
             return True
         else:
             return False
+
+    def read_instrument_errors(self):
+        """
+        Checks for instrument errors
+
+        Args:
+            None
+
+        Returns:
+            list(Tuple): (error code, error message)
+
+        Raises:
+            None
+        """
+        # PSU too simple to have error monitoring
+        # so assume everything is fine!
+        return []
