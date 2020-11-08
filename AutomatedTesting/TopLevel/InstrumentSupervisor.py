@@ -46,8 +46,8 @@ class InstrumentSupervisor():
         Raises:
             None
         """
-        for x in self.instruments:
-            self.free_resource(x)
+        while(self.instruments != []):
+            self.free_resource(self.instruments[0])
 
     def signal_handler(self, a, b):
         """

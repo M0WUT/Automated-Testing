@@ -1,17 +1,16 @@
 from AutomatedTesting.TopLevel.MultiChannelInstrument import \
-    MultiChannelInstrument
-from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
-from time import sleep
+    MultiChannelInstrument, InstrumentChannel
 import logging
 from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
 
-class SignalGeneratorChannel():
+class SignalGeneratorChannel(InstrumentChannel):
     """
     Object containing properties of Signal Generator Output channel
 
     Args:
-        sigGen (SignalGenerator): Power Supply to which that channel belongs
+        instrument (SignalGenerator): Signal Generator to
+            which that channel belongs
         channelNumber (int): Channel Number on Signal Generator
         maxPower (float): Maximum Output Power (in dBm)
         minPower (float): Minimum Output Power (in dBm)
@@ -19,7 +18,7 @@ class SignalGeneratorChannel():
         minFreq (float): Minimum Carrier Frequency (in Hz)
 
     Attributes:
-        sigGen (SignalGenerator): Signal Generator to which
+        instrument (SignalGenerator): Signal Generator to which
             this channel belongs
         reserved (bool): True if something has reserved control of this channel
         name (str): Name of the purpose that has this channel reserved
@@ -43,13 +42,6 @@ class SignalGeneratorChannel():
         minFreq
     ):
 
-        self.instrument = None
-        self.reserved = False
-        self.name = str(channelNumber)
-        self.errorThread = None
-        self.error = False
-        self.channelNumber = channelNumber
-
         if(maxPower < minPower):
             raise ValueError
         self.absoluteMaxPower = maxPower
@@ -68,6 +60,8 @@ class SignalGeneratorChannel():
         self.ocpEnabled = False
         self.outputEnabled = False
 
+        super().__init__(channelNumber)
+
     def _free(self):
         """
         Removes the reservation on this power supply channel
@@ -81,11 +75,7 @@ class SignalGeneratorChannel():
         Raises:
             AssertionError: If this channel is not already reserved
         """
-        assert self.reserved is True, \
-            f"Attempted to free unused channel {self.channelNumber} " \
-            f"on {self.psu.name}"
-        self.name = str(self.channelNumber)
-        self.reserved = False
+        super()._free()
         self.maxPower = self.absoluteMaxPower
         self.minPower = self.absoluteMinPower
         self.maxFreq = self.absoluteMaxFreq
@@ -158,102 +148,6 @@ class SignalGeneratorChannel():
         # to instrument limits so just use those
         self.maxFreq = maxFreq
         self.minFreq = minFreq
-
-    def enable_output(self, enabled):
-        """
-        Enables / Disables channel output
-
-        Args:
-            enabled (bool): 0/False = Disable output, 1/True = Enable output
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-
-        # If we're turning off the output, disable the monitoring thread
-        # Otherwise there's a race condition in shutdown where the output
-        # is disabled before the monitor thread finished and it thinks the
-        # protection has tripped
-        if(self.errorThread is not None):
-            if(enabled):
-                logging.error(
-                    f"{self.instrument.name}, "
-                    f"Channel {self.name} "
-                    f"attempted to enable while already enabled"
-                )
-                raise ValueError
-
-            self.errorThread.terminate()
-            self.errorThread = None
-
-        self.instrument.enable_channel_output(self.channelNumber, enabled)
-        self.outputEnabled = enabled
-
-        if(enabled):
-            logging.debug(
-                f"{self.instrument.name}, "
-                f"Channel {self.name}: Output Enabled"
-            )
-            self.errorThread = ProcessWithCleanStop(
-                target=self.check_for_errors
-            )
-            sleep(0.5)  # Allow a small amount of time for inrush current
-            self.errorThread.start()
-        else:
-            logging.debug(
-                f"{self.instrument.name}, "
-                f"Channel {self.name}: Output Disabled"
-            )
-
-    def check_for_errors(self, event):
-        """
-        Checks that channel with output enabled has no errors attached to it
-        This is blocking so should only be called within a separate thread
-
-        Args:
-            event (multiprocessing.Event): Thread will terminate cleanly
-                when this is set
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        while not event.is_set() and self.error is False:
-            if self.instrument.check_channel_errors(self.channelNumber):
-                self.error = True
-                self.instrument.supervisor.handle_instrument_error()
-
-    def cleanup(self):
-        """
-        Disables channel output, removes reservation on channel and
-        shutdowns the monitoring thread so channel is ready for
-        shutdown
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if self.errorThread is not None:
-            self.errorThread.terminate()
-            self.errorThread = None
-        self.enable_output(False)
-        if(self.reserved):
-            self._free()
-
-        logging.info(
-            f"{self.instrument.name}, "
-            f"Channel {self.name} shutdown"
-        )
 
     def set_power(self, power):
         """

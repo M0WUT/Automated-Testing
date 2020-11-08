@@ -219,6 +219,9 @@ class BaseInstrument():
                         f"Shutting down..."
                     )
                 self.supervisor.handle_instrument_error()
+        logging.debug(
+            f"{self.name} monitoring thread shutdown"
+        )
 
     def cleanup(self):
         """
@@ -239,9 +242,6 @@ class BaseInstrument():
         if self.errorThread is not None:
             self.errorThread.terminate()
             self.errorThread = None
-            logging.debug(
-                f"{self.name} monitoring thread shutdown"
-            )
         self.close_remote_session()
 
     def close_remote_session(self):

@@ -1,6 +1,5 @@
 from AutomatedTesting.TopLevel.MultiChannelInstrument import \
-    MultiChannelInstrument
-from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
+    MultiChannelInstrument, InstrumentChannel
 from time import sleep
 import logging
 
@@ -66,7 +65,7 @@ class PowerSupply(MultiChannelInstrument):
             x.enable_output(False)
             x.set_voltage(x.minVoltage)
             x.set_current(x.minCurrent)
-        logging.info(f"PSU: {self.name} initialised")
+        logging.info(f"{self.name} initialised")
 
     def set_channel_voltage(self, channelNumber, voltage):
         raise NotImplementedError  # pragma: no cover
@@ -93,7 +92,7 @@ class PowerSupply(MultiChannelInstrument):
         raise NotImplementedError  # pragma: no cover
 
 
-class PowerSupplyChannel():
+class PowerSupplyChannel(InstrumentChannel):
     """
     Object containing properties of PSU Output channel
 
@@ -129,15 +128,6 @@ class PowerSupplyChannel():
         maxCurrent,
         minCurrent
     ):
-
-        self.instrument = None
-        self.reserved = False
-        self.name = str(channelNumber)
-        self.errorThread = None
-        self.error = False
-
-        self.channelNumber = channelNumber
-
         # Absolute max / min are limits fixed by instrument
         # max / min include extra limits imposed externally
         if(maxVoltage < minVoltage):
@@ -158,6 +148,8 @@ class PowerSupplyChannel():
         self.ocpEnabled = False
         self.outputEnabled = False
 
+        super().__init__(channelNumber)
+
     def _free(self):
         """
         Removes the reservation on this power supply channel
@@ -171,11 +163,7 @@ class PowerSupplyChannel():
         Raises:
             AssertionError: If this channel is not already reserved
         """
-        assert self.reserved is True, \
-            f"Attempted to free unused channel {self.channelNumber} " \
-            f"on {self.instrument.name}"
-        self.name = str(self.channelNumber)
-        self.reserved = False
+        super()._free()
         self.maxVoltage = self.absoluteMaxVoltage
         self.minVoltage = self.absoluteMinVoltage
         self.maxCurrent = self.absoluteMaxCurrent
@@ -201,7 +189,7 @@ class PowerSupplyChannel():
             (minVoltage < self.absoluteMinVoltage)
         ):
             logging.error(
-                f"PSU: {self.instrument.name}, Channel {self.channelNumber} "
+                f"{self.instrument.name}, Channel {self.channelNumber} "
                 f"requested voltage limits ({minVoltage}V - {maxVoltage}V) "
                 f" are outside channel limits "
                 f"({self.absoluteMinVoltage}V - {self.absoluteMaxVoltage}V)"
@@ -233,7 +221,7 @@ class PowerSupplyChannel():
             (minCurrent < self.absoluteMinCurrent)
         ):
             logging.error(
-                f"PSU: {self.instrument.name}, Channel {self.channelNumber} "
+                f"{self.instrument.name}, Channel {self.channelNumber} "
                 f"requested current limits ({minCurrent}V - {maxCurrent}V) "
                 f" are outside channel limits "
                 f"({self.absoluteMinCurrent}V - {self.absoluteMaxCurrent}V)"
@@ -267,13 +255,13 @@ class PowerSupplyChannel():
                 sleep(0.1)
                 if self.measure_voltage() != voltage:
                     logging.error(
-                        f"PSU: {self.instrument.name}, "
+                        f"{self.instrument.name}, "
                         f"Channel {self.channelNumber}"
                         f" is current limiting on turn on"
                     )
                     assert False
-            logging.info(
-                f"PSU: {self.instrument.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name} set to {voltage}V"
             )
         else:
@@ -315,8 +303,8 @@ class PowerSupplyChannel():
         """
 
         x = self.instrument.measure_channel_voltage(self.channelNumber)
-        logging.info(
-            f"PSU: {self.instrument.name}, "
+        logging.debug(
+            f"{self.instrument.name}, "
             f"Channel {self.name} measured as to {x}V"
         )
         return x
@@ -340,8 +328,8 @@ class PowerSupplyChannel():
             self.instrument.set_channel_current(self.channelNumber, current)
             x = self.read_current_setpoint()
             assert(x == current)
-            logging.info(
-                f"PSU: {self.instrument.name}, Channel {self.name} "
+            logging.debug(
+                f"{self.instrument.name}, Channel {self.name} "
                 f"current limit set to {x}A"
             )
         else:
@@ -382,61 +370,13 @@ class PowerSupplyChannel():
             None
         """
         x = self.instrument.measure_channel_current(self.channelNumber)
-        logging.info(
-            f"PSU: {self.instrument.name}, Channel {self.name} "
+        logging.debug(
+            f"{self.instrument.name}, Channel {self.name} "
             f"current measured as {x}A"
         )
         return x
 
-    def enable_output(self, enabled):
-        """
-        Enables / Disables channel output
-
-        Args:
-            enabled (bool): 0/False = Disable output, 1/True = Enable output
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-
-        # If we're turning off the output, disable the monitoring thread
-        # Otherwise there's a race condition in shutdown where the output
-        # is disabled before the monitor thread finished and it thinks the
-        # protection has tripped
-        if(self.errorThread is not None):
-            if(enabled):
-                logging.error(
-                    f"PSU: {self.instrument.name}, Channel {self.name} "
-                    f"attempted to enable while already enabled"
-                )
-                raise ValueError
-
-            self.errorThread.terminate()
-            self.errorThread = None
-
-        self.instrument.enable_channel_output(self.channelNumber, enabled)
-        self.outputEnabled = enabled
-
-        if(enabled):
-            logging.info(
-                f"PSU: {self.instrument.name}, "
-                f"Channel {self.name}: Output Enabled"
-            )
-            self.errorThread = ProcessWithCleanStop(
-                target=self.check_for_errors
-            )
-            sleep(0.5)  # Allow a small amount of time for inrush current
-            self.errorThread.start()
-        else:
-            logging.info(
-                f"PSU: {self.instrument.name}, "
-                f"Channel {self.name}: Output Disabled"
-            )
-
-    def enable_ovp(self, enabled):
+    def enable_ovp(self, enabled=True):
         """
         Enables / Disables channel Overvoltage proection
 
@@ -453,17 +393,20 @@ class PowerSupplyChannel():
         self.ovpEnabled = enabled
 
         if enabled:
-            logging.info(
-                f"PSU: {self.instrument.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: OVP Enabled"
             )
         else:
-            logging.info(
-                f"PSU: {self.instrument.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: OVP Disabled"
             )
 
-    def enable_ocp(self, enabled):
+    def disable_ovp(self):
+        self.enable_ovp(False)
+
+    def enable_ocp(self, enabled=True):
         """
         Enables / Disables channel Overcurrent proection
 
@@ -480,44 +423,15 @@ class PowerSupplyChannel():
         self.ocpEnabled = enabled
 
         if enabled:
-            logging.info(
-                f"PSU: {self.instrument.name}, f"
+            logging.debug(
+                f"{self.instrument.name}, f"
                 f"Channel {self.name}: OCP Enabled"
             )
         else:
-            logging.info(
-                f"PSU: {self.instrument.name}, "
+            logging.debug(
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: OCP Disabled"
             )
 
-    def check_for_errors(self, event):
-        """
-        Checks that channel with output enabled has no errors attached to it
-        This is blocking so should only be called within a separate thread
-
-        Args:
-            event (multiprocessing.Event): Thread will terminate cleanly
-                when this is set
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        while not event.is_set() and self.error is False:
-            if self.instrument.check_channel_errors(self.channelNumber):
-                self.error = True
-                self.instrument.supervisor.handle_instrument_error()
-
-    def cleanup(self):
-        if self.errorThread is not None:
-            self.errorThread.terminate()
-            self.errorThread = None
-        self.enable_output(False)
-        if(self.reserved):
-            self._free()
-
-        logging.info(
-            f"PSU: {self.instrument.name}, Channel {self.name} shutdown"
-        )
+    def disable_ocp(self):
+        self.enable_ocp(False)
