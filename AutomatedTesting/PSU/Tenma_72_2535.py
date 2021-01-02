@@ -35,8 +35,6 @@ class Tenma_72_2535(PowerSupply):
             name=name,
             channelCount=1,
             channels=[channel1],
-            hasOVP=True,
-            hasOCP=True,
             baud_rate=9600,
             read_termination=None,
             write_termination=None,
@@ -59,7 +57,7 @@ class Tenma_72_2535(PowerSupply):
         """
         pass
 
-    def _read(self):
+    def _read(self, numBytes):
         """
         Reads data from PSU as it's infernal with no termination
 
@@ -72,15 +70,45 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        ret = ""
-        while(1):
-            try:
-                ret += (self.dev.read_bytes(1).decode("utf-8"))
-            except VisaIOError as e:
-                if ret == "":
-                    raise e
-                else:
-                    return ret
+        return self.dev.read_bytes(numBytes).decode("utf-8")
+
+    def _query(self, command, numBytes):
+        """
+        Sends command and returns response
+        Due to this PSU being a total pain,
+        need to specify number of bytes to read
+
+        Args:
+            command (str): Command to send
+            numBytes (int): Number of bytes in response
+
+        Returns:
+            str: Response from Instrument
+
+        Raises:
+            None
+        """
+        try:
+            self.lock.acquire()
+            self._write(command, acquireLock=False)
+            return self._read(numBytes)
+        finally:
+            self.lock.release()
+
+    def read_id(self):
+        """
+        Queries Device ID
+
+        Args:
+            None
+
+        Returns:
+            str: Device ID String
+
+        Raises:
+            None
+        """
+        return self._query("*IDN?", 18)
 
     def set_channel_voltage(self, channelNumber, voltage):
         """
@@ -113,7 +141,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VSET{channelNumber}?"))
+        return float(self._query(f"VSET{channelNumber}?", 5))
 
     def measure_channel_voltage(self, channelNumber):
         """
@@ -129,7 +157,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VOUT{channelNumber}?"))
+        return float(self._query(f"VOUT{channelNumber}?", 5))
 
     def set_channel_current(self, channelNumber, current):
         """
@@ -162,7 +190,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"ISET{channelNumber}?"))
+        return float(self._query(f"ISET{channelNumber}?", 6))
 
     def measure_channel_current(self, channelNumber):
         """
@@ -178,7 +206,7 @@ class Tenma_72_2535(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"IOUT{channelNumber}?"))
+        return float(self._query(f"IOUT{channelNumber}?", 5))
 
     def enable_channel_output(self, channelNumber, enabled):
         """
@@ -253,7 +281,7 @@ class Tenma_72_2535(PowerSupply):
 
         # Get status byte and convert to string in reverse
         # order so status[0] = bit 0
-        status = ord(self._query("STATUS?"))
+        status = ord(self._query("STATUS?", 1))
         status = format(status, '08b')[::-1]
 
         # Only have one channel on this device

@@ -55,10 +55,10 @@ class SignalGeneratorChannel(InstrumentChannel):
         self.absoluteMinFreq = minFreq
         self.maxFreq = self.absoluteMaxFreq
         self.minFreq = self.absoluteMinFreq
-
-        self.ovpEnabled = False
-        self.ocpEnabled = False
         self.outputEnabled = False
+
+        self.freqSetpoint = None
+        self.powerSetpoint = None
 
         super().__init__(channelNumber)
 
@@ -164,26 +164,29 @@ class SignalGeneratorChannel(InstrumentChannel):
                 max/min power
             AssertionError: If readback power != requested power
         """
-        if(self.minPower <= power <= self.maxPower):
-            self.instrument.set_channel_power(self.channelNumber, power)
-            x = self.read_power()
-            if(x != power):
-                logging.error(
+        if power != self.powerSetpoint:
+            if(self.minPower <= power <= self.maxPower):
+                self.instrument.set_channel_power(self.channelNumber, power)
+                x = self.read_power()
+                if(x != power):
+                    logging.error(
+                        f"{self.instrument.name}, "
+                        f"Channel {self.name} failed to set power to "
+                        f"{power}dBm. Readback value: {x}dBm"
+                    )
+
+                self.powerSetpoint = power
+            else:
+                raise ValueError(
+                    f"Requested power of {power}dBm outside limits for "
                     f"{self.instrument.name}, "
-                    f"Channel {self.name} failed to set power to "
-                    f"{power}dBm. Readback value: {x}dBm"
+                    f"Channel {self.channelNumber}"
                 )
 
-            logging.debug(
-                f"{self.instrument.name}, "
-                f"{self.name} set to {power}dBm"
-            )
-        else:
-            raise ValueError(
-                f"Requested power of {power}dBm outside limits for "
-                f"{self.instrument.name}, "
-                f"Channel {self.channelNumber}"
-            )
+        logging.debug(
+            f"{self.instrument.name}, "
+            f"{self.name} set to {power}dBm"
+        )
 
     def read_power(self):
         """
@@ -217,27 +220,29 @@ class SignalGeneratorChannel(InstrumentChannel):
                 max/min frequency
             AssertionError: If readback frequency != requested frequency
         """
-        if(self.minFreq <= freq <= self.maxFreq):
-            self.instrument.set_channel_freq(self.channelNumber, freq)
-            x = self.read_freq()
-            if(x != freq):
-                logging.error(
-                    f"{self.instrument.name}, "
-                    f"Channel {self.name} failed to set frequency to "
-                    f"{readable_freq(freq)}. "
-                    f"Readback value: {readable_freq(x)}"
-                )
+        if freq != self.freqSetpoint:
+            if(self.minFreq <= freq <= self.maxFreq):
+                self.instrument.set_channel_freq(self.channelNumber, freq)
+                x = self.read_freq()
+                if(x != freq):
+                    logging.error(
+                        f"{self.instrument.name}, "
+                        f"Channel {self.name} failed to set frequency to "
+                        f"{readable_freq(freq)}. "
+                        f"Readback value: {readable_freq(x)}"
+                    )
 
-            logging.debug(
-                f"{self.instrument.name}, "
-                f"Channel {self.name} set to {readable_freq(freq)}"
-            )
-        else:
-            raise ValueError(
-                f"Requested freq of {readable_freq(freq)} outside limits for "
-                f"{self.instrument.name}, "
-                f"Channel {self.channelNumber}"
-            )
+                logging.debug(
+                    f"{self.instrument.name}, "
+                    f"Channel {self.name} set to {readable_freq(freq)}"
+                )
+                self.freqSetpoint = freq
+            else:
+                raise ValueError(
+                    f"Requested freq of {readable_freq(freq)} outside limits for "
+                    f"{self.instrument.name}, "
+                    f"Channel {self.channelNumber}"
+                )
 
     def read_freq(self):
         """

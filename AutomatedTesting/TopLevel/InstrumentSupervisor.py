@@ -30,10 +30,7 @@ class InstrumentSupervisor():
         self.shutdown = False
         signal.signal(signal.SIGUSR1, self.signal_handler)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def cleanup(self):
         """
         Shuts down all registered instruments
 

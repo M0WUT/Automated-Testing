@@ -10,25 +10,20 @@ class PowerSupply(MultiChannelInstrument):
     This should never be implemented directly
 
     Args:
-        name (str): Identifying string for power supply
         address (str):
             PyVisa String e.g. "GPIB0::14::INSTR"
             with device location
+        id (str): Expected string when ID is queried
+        name (str): Identifying string for power supply
         channelCount (int): Number of seperate output channels
         channels (List[PowerSupplyChannel]): List of PSU's output channels
-        hasOVP (bool): Whether PSU supports Over Voltage Protection
-        hasOCP (bool): Whether PSU supports Over Current Protection
         **kwargs: Passed to PyVisa Address field
 
     Returns:
         None
 
     Raises:
-        TypeError: If resourceManager is not a valid PyVisa
-            Resource Manager
-        ValueError: If Resource Manager fails to open device
-        AssertionError: If channel has ID greater than PSU channel
-            count
+        None
     """
     def __init__(
         self,
@@ -37,17 +32,8 @@ class PowerSupply(MultiChannelInstrument):
         name,
         channelCount,
         channels,
-        hasOVP,
-        hasOCP,
         **kwargs
     ):
-
-        # Check that we have a continous list of channels from
-        # ID = 1 -> channelCount
-
-        self.hasOVP = hasOVP
-        self.hasOCP = hasOCP
-
         super().__init__(
             address,
             id,
@@ -147,6 +133,8 @@ class PowerSupplyChannel(InstrumentChannel):
         self.ovpEnabled = False
         self.ocpEnabled = False
         self.outputEnabled = False
+        self.voltageSetpoint = 0
+        self.currentSetpoint = 0
 
         super().__init__(channelNumber)
 
@@ -248,28 +236,29 @@ class PowerSupplyChannel(InstrumentChannel):
                 max/min voltage
             AssertionError: If readback voltage != requested voltage
         """
-        if(self.minVoltage <= voltage <= self.maxVoltage):
-            self.instrument.set_channel_voltage(self.channelNumber, voltage)
-            assert(self.read_voltage_setpoint() == voltage)
-            if(self.outputEnabled):
-                sleep(0.1)
-                if self.measure_voltage() != voltage:
-                    logging.error(
-                        f"{self.instrument.name}, "
-                        f"Channel {self.channelNumber}"
-                        f" is current limiting on turn on"
-                    )
-                    assert False
-            logging.debug(
-                f"{self.instrument.name}, "
-                f"Channel {self.name} set to {voltage}V"
-            )
-        else:
-            raise ValueError(
-                f"Requested voltage of {voltage}V outside limits for "
-                f"Power supply {self.instrument.name}, "
-                f"Channel {self.channelNumber}"
-            )
+        if(voltage != self.voltageSetpoint):
+            if(self.minVoltage <= voltage <= self.maxVoltage):
+                self.instrument.set_channel_voltage(self.channelNumber, voltage)
+                assert(self.read_voltage_setpoint() == voltage)
+                if(self.outputEnabled):
+                    if self.measure_voltage() != voltage:
+                        logging.error(
+                            f"{self.instrument.name}, "
+                            f"Channel {self.channelNumber}"
+                            f" is current limiting on turn on"
+                        )
+                        assert False
+                logging.debug(
+                    f"{self.instrument.name}, "
+                    f"Channel {self.name} set to {voltage}V"
+                )
+                self.voltageSetpoint = voltage
+            else:
+                raise ValueError(
+                    f"Requested voltage of {voltage}V outside limits for "
+                    f"Power supply {self.instrument.name}, "
+                    f"Channel {self.channelNumber}"
+                )
 
     def read_voltage_setpoint(self):
         """
@@ -305,7 +294,7 @@ class PowerSupplyChannel(InstrumentChannel):
         x = self.instrument.measure_channel_voltage(self.channelNumber)
         logging.debug(
             f"{self.instrument.name}, "
-            f"Channel {self.name} measured as to {x}V"
+            f"Channel {self.name} measured as {x}V"
         )
         return x
 
@@ -324,20 +313,22 @@ class PowerSupplyChannel(InstrumentChannel):
                 max/min current
             AssertionError: If readback current != requested current
         """
-        if(self.minCurrent <= current <= self.maxCurrent):
-            self.instrument.set_channel_current(self.channelNumber, current)
-            x = self.read_current_setpoint()
-            assert(x == current)
-            logging.debug(
-                f"{self.instrument.name}, Channel {self.name} "
-                f"current limit set to {x}A"
-            )
-        else:
-            raise ValueError(
-                f"Requested current of {current}A outside limits for "
-                f"Power supply {self.instrument.name}, "
-                f"channel {self.channelNumber}"
-            )
+        if current != self.currentSetpoint:
+            if(self.minCurrent <= current <= self.maxCurrent):
+                self.instrument.set_channel_current(self.channelNumber, current)
+                x = self.read_current_setpoint()
+                assert(x == current)
+                logging.debug(
+                    f"{self.instrument.name}, Channel {self.name} "
+                    f"current limit set to {x}A"
+                )
+                self.currentSetpoint = current
+            else:
+                raise ValueError(
+                    f"Requested current of {current}A outside limits for "
+                    f"Power supply {self.instrument.name}, "
+                    f"channel {self.channelNumber}"
+                )
 
     def read_current_setpoint(self):
         """
@@ -424,7 +415,7 @@ class PowerSupplyChannel(InstrumentChannel):
 
         if enabled:
             logging.debug(
-                f"{self.instrument.name}, f"
+                f"{self.instrument.name}, "
                 f"Channel {self.name}: OCP Enabled"
             )
         else:
@@ -435,3 +426,10 @@ class PowerSupplyChannel(InstrumentChannel):
 
     def disable_ocp(self):
         self.enable_ocp(False)
+
+    def enable_output(self, enabled=True):
+        ocpEnabled = self.ocpEnabled
+        self.disable_ocp()
+        super().enable_output(enabled)
+        self.enable_ocp(ocpEnabled)
+

@@ -94,7 +94,6 @@ class MultiChannelInstrument(BaseInstrument):
         for x in self.channels:
             x.cleanup()
         super().cleanup()
-        logging.info(f"{self.name} Shutdown")
 
 
 class InstrumentChannel():

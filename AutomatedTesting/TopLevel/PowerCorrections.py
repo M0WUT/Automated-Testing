@@ -1,7 +1,6 @@
 import logging
 from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
-
 class PowerCorrections():
     def __init__(self, sigGen, powerMeter, freqRange, calibrationPower=-30):
         self.sigGen = sigGen
@@ -9,8 +8,6 @@ class PowerCorrections():
         self.freqRange = freqRange
         self.calibrationPower = calibrationPower
         self.corrections = {}
-        sigGen.set_freq(min(freqRange))
-        sigGen.set_power(self.calibrationPower)
 
         logging.debug("Waiting for user intervention")
 
@@ -19,23 +16,14 @@ class PowerCorrections():
             "any key to normalise..."
         )
         logging.debug("User intervention complete")
+        logging.info(f"Beginning normalisation at {self.calibrationPower}dBm")
+        sigGen.set_freq(min(freqRange))
+        sigGen.set_power(self.calibrationPower)
         self.sigGen.enable_output()
-
-        # Find power that produces >-35dB at power meter, just so this
-        # doesn't take forever
-        measuredPower = self.powerMeter.measure_power(min(freqRange))
-        if(measuredPower < -35):
-            self.calibrationPower += (self.calibrationPower - measuredPower)
-            logging.info(
-                f"Calibration power to low, "
-                f"adjusting to {self.calibrationPower}"
-            )
-            self.sigGen.set_power(self.calibrationPower)
-            assert self.powerMeter.measure_power(min(freqRange) > -35)
 
         for freq in self.freqRange:
             self.sigGen.set_freq(freq)
-            measuredPower = self.powerMeter.measure_power()
+            measuredPower = self.powerMeter.measure_power(freq)
             cableLoss = self.calibrationPower - measuredPower
             self.corrections[freq] = cableLoss
 

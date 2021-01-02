@@ -2,8 +2,7 @@ from AutomatedTesting.TopLevel.BaseInstrument import BaseInstrument
 from AutomatedTesting.TopLevel.PowerCorrections import PowerCorrections
 import logging
 
-
-class SpectrumAnalyser(BaseInstrument):
+class PowerMeter(BaseInstrument):
     def __init__(
         self,
         address,
@@ -14,7 +13,7 @@ class SpectrumAnalyser(BaseInstrument):
         **kwargs
     ):
         """
-        Pure virtual class for Spectrum Analyser
+        Pure virtual class for RF Power Meters
         This should never be implemented directly
 
         Args:
@@ -36,12 +35,35 @@ class SpectrumAnalyser(BaseInstrument):
         super().__init__(address, id, name, **kwargs)
         self.corrections = None
 
-    def set_centre_freq(self, freq):
+    def reset(self):
+        super().reset()
+        self.external_zero()
+
+    def initialise(self, resourceManager, supervisor):
         """
-        Sets centre frequency
+        Setups device and checks it can be communicated with
+        Puts device in a reset state
 
         Args:
-           freq (float): Frequency in Hz
+            resourceManager (PyVisa Resource Manager)
+            supervisor (InstrumentSupervisor)
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        super().initialise(resourceManager, supervisor)
+        logging.info(f"{self.name} initialised")
+
+    def internal_zero(self):
+        """
+        Zeros power meter. Does not require external intervation
+        i.e. removal of RF signal / disconnection of meter
+
+        Args:
+            None
 
         Returns:
             None
@@ -51,12 +73,13 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def set_start_freq(self, freq):
+    def external_zero(self):
         """
-        Sets start frequency
+        Zeros power meter. Does require external intervation
+        i.e. removal of RF signal / disconnection of meter
 
         Args:
-           freq (float): Frequency in Hz
+            None
 
         Returns:
             None
@@ -66,87 +89,13 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def set_stop_freq(self, freq):
+    def set_freq(self, freq):
         """
-        Sets stop frequency
+        Informs power meter of frequency in to allow to
+        compensate
 
         Args:
-           freq (float): Frequency in Hz
-
-        Returns:
             None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def set_span(self, freq):
-        """
-        Sets x axis span
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def set_rbw(self, rbw):
-        """
-        Sets Resolution Bandwidth
-
-        Args:
-           rbw (float): RBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def set_vbw(self, vbw):
-        """
-        Sets Video Bandwidth
-
-        Args:
-           vbw (float): VBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def set_sweep_points(self, numPoints):
-        """
-        Sets Number of Points in sweep
-
-        Args:
-           vbw (float): VBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def set_sweep_time(self, sweepTime):
-        """
-        Sets Number of Points in sweep
-
-        Args:
-           sweepTime (float): sweep time in ms, or "auto"
 
         Returns:
             None
@@ -172,21 +121,6 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def set_ampl_reference(self, power):
-        """
-        Sets amplitude reference
-
-        Args:
-            power (float): Reference Level in dBm
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def apply_corrections(self, corrections):
         assert isinstance(corrections, PowerCorrections)
         self.corrections = corrections
@@ -199,6 +133,6 @@ class SpectrumAnalyser(BaseInstrument):
             x = power
 
         logging.debug(
-                f"{self.name} measured power of {round(x, 1)}dBm"
-            )
+            f"{self.name} measured power of {round(x, 1)}dBm"
+        )
         return x

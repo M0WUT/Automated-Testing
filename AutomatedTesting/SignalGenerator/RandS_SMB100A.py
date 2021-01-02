@@ -1,6 +1,7 @@
 from AutomatedTesting.SignalGenerator.SignalGenerator import \
     SignalGenerator, SignalGeneratorChannel
 import logging
+from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
 
 class RandS_SMB100A(SignalGenerator):
@@ -96,7 +97,12 @@ class RandS_SMB100A(SignalGenerator):
         return float(self._query("SOURce:POWer:POWer?"))
 
     def set_channel_freq(self, channelNumber, freq):
-        self._write(f"FREQ {freq}")
+        if(round(freq, 3) != freq):
+            logging.warning(
+                f"{self.name} has resolution of 0.001Hz."
+                f"Requested freq of {readable_freq(freq)} was truncated"
+            )
+        self._write(f"FREQ {round(freq, 3)}")
 
     def read_channel_freq(self, channelNumber):
         return float(self._query("FREQ?"))

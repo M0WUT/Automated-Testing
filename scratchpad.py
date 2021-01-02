@@ -2,17 +2,14 @@ from AutomatedTesting.TestDefinitions.TestSupervisor import \
     TestSupervisor
 import logging
 from AutomatedTesting.TopLevel.config import tests_to_perform, testSetup
+from time import sleep
+import struct
 
 
-with TestSupervisor(loggingLevel=logging.INFO, setup=testSetup) as supervisor:
-    for test in tests_to_perform:
-        supervisor.request_measurements(
-            test.generate_measurement_points()
-        )
 
+with TestSupervisor(loggingLevel=logging.INFO, setup=testSetup, calibrationPower=0) as supervisor:
+    for x in tests_to_perform:
+        supervisor.request_measurements(x.generate_measurement_points())
     supervisor.run_measurements()
-
-    for test in tests_to_perform:
-        test.process_results(
-            supervisor.results
-        )
+    for x in tests_to_perform:
+        x.process_results(supervisor.results)

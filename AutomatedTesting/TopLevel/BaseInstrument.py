@@ -53,15 +53,12 @@ class BaseInstrument():
             ValueError: Resource Manager / Supervisor is not valid
             AssertionError: Fails to query correct device ID
         """
+        logging.debug(f"Initialising {self.name}")
         if (isinstance(resourceManager, pyvisa.highlevel.ResourceManager)):
-            try:
-                self.dev = resourceManager.open_resource(
-                    self.address,
-                    **self.kwargs
-                )
-            except ValueError:
-                logging.critical(f"Unable to open instrument: {self.name}")
-                sys.exit(1)
+            self.dev = resourceManager.open_resource(
+                self.address,
+                **self.kwargs
+            )
         else:
             raise ValueError
 
@@ -69,8 +66,6 @@ class BaseInstrument():
             self.supervisor = supervisor
         else:
             raise ValueError
-
-        self.reset()
 
         x = self.read_id().strip()
         if(x != self.id):
@@ -80,6 +75,8 @@ class BaseInstrument():
                 f"Received ID: {x}"
             )
             raise AssertionError
+
+        self.reset()
 
         errorList = self.read_instrument_errors()
         while(errorList != []):
@@ -127,7 +124,8 @@ class BaseInstrument():
         Raises:
             None
         """
-        self._write("*RST")
+        self._write("*RST")  # Reset device
+        self._write("*CLS")  # Clear errors
 
     def _write(self, command, acquireLock=True):
         """
@@ -172,7 +170,7 @@ class BaseInstrument():
         Raises:
             None
         """
-        return self.dev.read()
+        return self.dev.read().strip()
 
     def _query(self, command):
         """
@@ -194,6 +192,26 @@ class BaseInstrument():
         finally:
             self.lock.release()
 
+    def _query_raw(self, command):
+        """
+        Sends command and returns raw response
+
+        Args:
+            command (str): Command to send
+
+        Returns:
+            str: Response from Instrument
+
+        Raises:
+            None
+        """
+        try:
+            self.lock.acquire()
+            self._write(command, acquireLock=False)
+            return self.dev.read_raw()
+        finally:
+            self.lock.release()
+
     def check_instrument_errors(self, event):
         """
         Function that lives in separate thread to monitor
@@ -210,11 +228,12 @@ class BaseInstrument():
             None
         """
         while not event.is_set() and self.error is False:
+            sleep(1)
             errorList = self.read_instrument_errors()
             if(errorList != []):
                 self.error = True
                 for code, message in errorList:
-                    logging.warning(
+                    logging.error(
                         f"{self.name} reporting error {code} ({message})."
                         f"Shutting down..."
                     )
@@ -243,6 +262,7 @@ class BaseInstrument():
             self.errorThread.terminate()
             self.errorThread = None
         self.close_remote_session()
+        logging.info(f"{self.name} Shutdown")
 
     def close_remote_session(self):
         """

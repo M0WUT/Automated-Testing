@@ -47,6 +47,14 @@ with InstrumentSupervisor() as tb:
             tb.free_resource(sigGen)
 
     @pytest.mark.sigGen
+    def test_set_high_resolution_freq(channel):
+        try:
+            channel.set_freq(1e9 + 0.00001)
+            assert channel.read_freq() == 1e9
+        finally:
+            tb.free_resource(sigGen)
+
+    @pytest.mark.sigGen
     def test_set_high_invalid_power(channel):
         try:
             with pytest.raises(ValueError):
