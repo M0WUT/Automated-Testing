@@ -10,10 +10,17 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--skipSigGen",
+        "--skipSmb100a",
         action="store_true",
         default=False,
-        help="Skip Long Signal Generator specific tests"
+        help="Skip Long SMB100A specific tests"
+    )
+
+    parser.addoption(
+        "--skipSdg2122x",
+        action="store_true",
+        default=False,
+        help="Skip Long SDG2122X specific tests"
     )
 
 
@@ -25,7 +32,12 @@ def pytest_configure(config):
 
     config.addinivalue_line(
         "markers",
-        "sigGen: mark test as Signal Generator specific"
+        "smb100a: mark test as SMB100a specific"
+    )
+    
+    config.addinivalue_line(
+        "markers",
+        "sdg2122x: mark test as SDG2122X specific"
     )
 
 
@@ -38,11 +50,11 @@ def pytest_collection_modifyitems(config, items):
             if "psu" in item.keywords:
                 item.add_marker(skip_list)
 
-    if config.getoption("--skipSigGen"):
+    if config.getoption("--skipSmb100a"):
         skip_list = pytest.mark.skip(
-            reason="Skipping Long Signal Generator specific tests"
+            reason="Skipping Long SMB100A specific tests"
         )
         for item in items:
-            if "sigGen" in item.keywords:
+            if "smb100a" in item.keywords:
                 item.add_marker(skip_list)
     return

@@ -8,7 +8,7 @@ import logging
 
 class TestSupervisor():
     def __init__(
-        self, loggingLevel, setup,
+        self, loggingLevel, instruments,
         saveResults=True, calibrationPower=-30
     ):
         logging.getLogger("pyvisa").setLevel(logging.WARNING)
@@ -33,7 +33,7 @@ class TestSupervisor():
             self.results = []
 
         self.requestedMeasurements = []
-        self.setup = setup
+        self.instruments = instruments
         self.gateSupply = None
         self.drainSupply = None
         self.gateVoltmeter = None
@@ -42,93 +42,15 @@ class TestSupervisor():
         self.measurementFreqs = []
         # Request source / as these are mandatory
         self.instrumentSupervisor.request_resources(
-            [self.setup.signalSource, self.setup.signalSink]
+            self.instruments
         )
-
-        self.signalSink = self.setup.signalSink
-
-        # Setup limits on input device
-        self.signalSource = self.setup.signalSource.reserve_channel(
-            self.setup.signalSourceChannel,
-            "Signal Source"
-        )
-
-        self.signalSource.set_freq_limits(
-            self.setup.dutLimits.minFreq,
-            self.setup.dutLimits.maxFreq,
-        )
-
-        self.signalSource.set_power_limits(
-            self.signalSource.absoluteMinPower,
-            self.setup.dutLimits.maxInputPower
-        )
-
-        # Setup gate supply (if needed)
-        if self.setup.gateSupply:
-            self.instrumentSupervisor.request_resources(
-                [self.setup.gateSupply]
-            )
-
-            self.gateSupply = self.setup.gateSupply.reserve_channel(
-                self.setup.gateSupplyChannel,
-                "Gate Voltage"
-            )
-
-            self.gateSupply.set_voltage_limits(
-                0,
-                self.setup.dutLimits.maxGateVoltage
-            )
-
-            self.gateSupply.set_current(
-                50e-3
-            )
-
-            self.drainSupply.enable_ocp()
-
-        # @TODO Add voltmeter
-        if self.setup.gateVoltmeter:
-            raise NotImplementedError
-
-        if self.setup.drainSupply:
-            self.instrumentSupervisor.request_resources(
-                [self.setup.drainSupply]
-            )
-
-            self.drainSupply = self.setup.drainSupply.reserve_channel(
-                self.setup.drainSupplyChannel,
-                "Drain Voltage"
-            )
-
-            self.drainSupply.set_voltage_limits(
-                0,
-                self.setup.dutLimits.maxDrainVoltage
-            )
-
-            self.drainSupply.set_current_limits(
-                0,
-                self.setup.dutLimits.maxDrainCurrent
-            )
-
-            self.drainSupply.set_current(
-                self.setup.dutLimits.maxDrainCurrent
-            )
-
-            self.drainSupply.enable_ocp()
-
-        # @TODO Add voltmeter
-        if self.setup.drainVoltmeter:
-            raise NotImplementedError
-
-        # @TODO Add ammeter
-        if self.setup.drainAmmeter:
-            raise NotImplementedError
 
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, *args, **kwargs):
         self.instrumentSupervisor.cleanup()
-        if self.saveResults is True:
+        if self.saveResults:
             self.results.cleanup()
 
     def request_measurements(self, measurements):

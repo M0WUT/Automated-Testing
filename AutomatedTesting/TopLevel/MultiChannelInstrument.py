@@ -214,7 +214,7 @@ class InstrumentChannel():
         if(self.reserved):
             self._free()
 
-        logging.info(
+        logging.debug(
             f"{self.instrument.name}, "
             f"Channel {self.name} shutdown"
         )

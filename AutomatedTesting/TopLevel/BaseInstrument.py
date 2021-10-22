@@ -1,5 +1,6 @@
 import pyvisa
-from AutomatedTesting.TopLevel.InstrumentSupervisor import InstrumentSupervisor
+from AutomatedTesting.TopLevel.InstrumentSupervisor import \
+    InstrumentSupervisor, InstrumentConnectionError
 from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from multiprocessing import Lock
 from time import sleep
@@ -53,18 +54,18 @@ class BaseInstrument():
             AssertionError: Fails to query correct device ID
         """
         logging.debug(f"Initialising {self.name}")
-        if (isinstance(resourceManager, pyvisa.highlevel.ResourceManager)):
+        assert isinstance(resourceManager, pyvisa.highlevel.ResourceManager)
+
+        try:
             self.dev = resourceManager.open_resource(
                 self.address,
                 **self.kwargs
             )
-        else:
-            raise ValueError
+        except pyvisa.VisaIOError:
+            raise InstrumentConnectionError
 
-        if(isinstance(supervisor, InstrumentSupervisor)):
-            self.supervisor = supervisor
-        else:
-            raise ValueError
+        assert isinstance(supervisor, InstrumentSupervisor)
+        self.supervisor = supervisor
 
         x = self.read_id().strip()
         if(x != self.id):

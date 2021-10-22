@@ -168,12 +168,10 @@ class SignalGeneratorChannel(InstrumentChannel):
             if(self.minPower <= power <= self.maxPower):
                 self.instrument.set_channel_power(self.channelNumber, power)
                 x = self.read_power()
-                if(x != power):
-                    logging.error(
-                        f"{self.instrument.name}, "
-                        f"Channel {self.name} failed to set power to "
-                        f"{power}dBm. Readback value: {x}dBm"
-                    )
+                assert x == power, \
+                    f"{self.instrument.name}, " \
+                    f"Channel {self.name} failed to set power to " \
+                    f"{power}dBm. Readback value: {x}dBm"
 
                 self.powerSetpoint = power
             else:

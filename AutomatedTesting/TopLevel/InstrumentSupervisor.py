@@ -5,6 +5,10 @@ import sys
 import logging
 
 
+class InstrumentConnectionError(Exception):
+    pass
+
+
 class InstrumentSupervisor():
     def __init__(self, loggingLevel=logging.WARNING):
         """
@@ -31,9 +35,14 @@ class InstrumentSupervisor():
         signal.signal(signal.SIGUSR1, self.signal_handler)
 
     def __enter__(self):
+        # Need this to also support being in a context
+        # manager for some of the unit tests
         return self
 
     def __exit__(self, *args, **kwargs):
+        self.cleanup()
+
+    def cleanup(self):
         """
         Shuts down all registered instruments
 
@@ -85,8 +94,13 @@ class InstrumentSupervisor():
             None
         """
         for x in instruments:
-            x.initialise(self.resourceManager, self)
-            self.instruments.append(x)
+            try:
+                x.initialise(self.resourceManager, self)
+                self.instruments.append(x)
+            except InstrumentConnectionError:
+                raise InstrumentConnectionError(
+                    f"Failed to connect to {x.name} at {x.address}"
+                )
 
     def free_resource(self, instrument):
         """

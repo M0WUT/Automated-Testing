@@ -30,18 +30,18 @@ class TestSetup():
         assert isinstance(signalSink, PowerMeter) or \
             isinstance(signalSink, SpectrumAnalyser)
 
-        if gateSupply is not None:
+        if gateSupply:
             assert isinstance(gateSupply, PowerSupply)
-            assert gateSupplyChannel is not None
-            assert dutLimits.maxGateVoltage is not None
+            assert gateSupplyChannel
+            assert dutLimits.maxGateVoltage
         else:
             assert gateVoltmeter is None
 
-        if drainSupply is not None:
+        if drainSupply:
             assert isinstance(drainSupply, PowerSupply)
-            assert drainSupplyChannel is not None
-            assert dutLimits.maxDrainVoltage is not None
-            assert dutLimits.maxDrainCurrent is not None
+            assert drainSupplyChannel
+            assert dutLimits.maxDrainVoltage
+            assert dutLimits.maxDrainCurrent
         else:
             assert drainVoltmeter is None and drainAmmeter is None
 
@@ -74,7 +74,7 @@ class DUTLimits():
         self.maxInputPower = maxInputPower
         self.maxGateVoltage = maxGateVoltage
 
-        if maxDrainVoltage is not None:
-            assert maxDrainCurrent is not None
+        if maxDrainVoltage:
+            assert maxDrainCurrent
         self.maxDrainVoltage = maxDrainVoltage
         self.maxDrainCurrent = maxDrainCurrent

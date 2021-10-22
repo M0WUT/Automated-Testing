@@ -108,11 +108,10 @@ class ResultsHandler():
 
         for x in self.measurements:
             rowIndex = 1 + self.measurements.index(x)
-            vgs = str(x.gateVoltage if x.gateVoltage is not None else "N/A")
-            vds = str(x.drainVoltage if x.drainVoltage is not None else "N/A")
-            ids = str(
-                x.drainCurrent * 1000 if x.drainCurrent is not None else "N/A"
-            )
+            vgs = str(x.gateVoltage if x.gateVoltage else "N/A")
+            vds = str(x.drainVoltage if x.drainVoltage else "N/A")
+            ids = str(x.drainCurrent * 1000 if x.drainCurrent else "N/A")
+
             self.worksheet.write(rowIndex, 0, x.freq)
             self.worksheet.write(rowIndex, 1, x.inputPower)
             self.worksheet.write(rowIndex, 2, vgs)
