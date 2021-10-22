@@ -2,6 +2,7 @@ from AutomatedTesting.TopLevel.BaseInstrument import BaseInstrument
 from AutomatedTesting.TopLevel.PowerCorrections import PowerCorrections
 import logging
 
+
 class PowerMeter(BaseInstrument):
     def __init__(
         self,

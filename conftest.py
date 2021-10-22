@@ -10,7 +10,7 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--skipSiggen",
+        "--skipSigGen",
         action="store_true",
         default=False,
         help="Skip Long Signal Generator specific tests"
@@ -38,11 +38,11 @@ def pytest_collection_modifyitems(config, items):
             if "psu" in item.keywords:
                 item.add_marker(skip_list)
 
-    if config.getoption("--skipSiggen"):
+    if config.getoption("--skipSigGen"):
         skip_list = pytest.mark.skip(
             reason="Skipping Long Signal Generator specific tests"
         )
         for item in items:
-            if "siggen" in item.keywords:
+            if "sigGen" in item.keywords:
                 item.add_marker(skip_list)
     return

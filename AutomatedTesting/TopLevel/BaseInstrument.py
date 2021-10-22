@@ -4,7 +4,6 @@ from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from multiprocessing import Lock
 from time import sleep
 import logging
-import sys
 
 
 class BaseInstrument():
@@ -258,7 +257,7 @@ class BaseInstrument():
         Raises:
             None
         """
-        if self.errorThread is not None:
+        if self.errorThread:
             self.errorThread.terminate()
             self.errorThread = None
         self.close_remote_session()

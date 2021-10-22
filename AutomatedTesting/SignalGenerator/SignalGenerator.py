@@ -239,8 +239,8 @@ class SignalGeneratorChannel(InstrumentChannel):
                 self.freqSetpoint = freq
             else:
                 raise ValueError(
-                    f"Requested freq of {readable_freq(freq)} outside limits for "
-                    f"{self.instrument.name}, "
+                    f"Requested freq of {readable_freq(freq)} outside limits "
+                    f"for {self.instrument.name}, "
                     f"Channel {self.channelNumber}"
                 )
 

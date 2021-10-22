@@ -4,7 +4,6 @@ from AutomatedTesting.PowerMeter.Agilent_U2001A import Agilent_U2001A
 from AutomatedTesting.SpectrumAnalyser.Agilent_E4407B import Agilent_E4407B
 from AutomatedTesting.TestDefinitions.TestSetup import TestSetup, DUTLimits
 from ProperTests.BasicS21 import BasicS21
-from ProperTests.BasicGainFlatness import BasicGainFlatness
 from ProperTests.GainFlatnessWithSweptFrequency import \
     GainFlatnessWithSweptFrequency
 from ProperTests.BasicDrainEfficiency import BasicDrainEfficiency

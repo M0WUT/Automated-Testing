@@ -1,6 +1,7 @@
 import logging
 from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
+
 class PowerCorrections():
     def __init__(self, sigGen, powerMeter, freqRange, calibrationPower=-30):
         self.sigGen = sigGen

@@ -1,6 +1,5 @@
 from AutomatedTesting.TopLevel.MultiChannelInstrument import \
     MultiChannelInstrument, InstrumentChannel
-from time import sleep
 import logging
 
 
@@ -238,7 +237,9 @@ class PowerSupplyChannel(InstrumentChannel):
         """
         if(voltage != self.voltageSetpoint):
             if(self.minVoltage <= voltage <= self.maxVoltage):
-                self.instrument.set_channel_voltage(self.channelNumber, voltage)
+                self.instrument.set_channel_voltage(
+                    self.channelNumber, voltage
+                )
                 assert(self.read_voltage_setpoint() == voltage)
                 if(self.outputEnabled):
                     if self.measure_voltage() != voltage:
@@ -315,7 +316,9 @@ class PowerSupplyChannel(InstrumentChannel):
         """
         if current != self.currentSetpoint:
             if(self.minCurrent <= current <= self.maxCurrent):
-                self.instrument.set_channel_current(self.channelNumber, current)
+                self.instrument.set_channel_current(
+                    self.channelNumber, current
+                )
                 x = self.read_current_setpoint()
                 assert(x == current)
                 logging.debug(
@@ -432,4 +435,3 @@ class PowerSupplyChannel(InstrumentChannel):
         self.disable_ocp()
         super().enable_output(enabled)
         self.enable_ocp(ocpEnabled)
-

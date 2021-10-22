@@ -9,4 +9,3 @@ class OutputSink(object):
     POWER_METER = 0
     SPECTRUM_ANALYSER = 1
     EITHER = 2
-

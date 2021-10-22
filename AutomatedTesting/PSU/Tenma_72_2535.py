@@ -1,5 +1,4 @@
 from AutomatedTesting.PSU.PSU import PowerSupply, PowerSupplyChannel
-from pyvisa.errors import VisaIOError
 import logging
 
 

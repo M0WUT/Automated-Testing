@@ -28,15 +28,12 @@ class MeasurementPoint(object):
         self.measureCurrent = measureCurrent
 
     def __eq__(self, other):
-        if(
+        return(
             (self.freq == other.freq) and
             (self.inputPower == other.inputPower) and
             (self.gateVoltage == other.gateVoltage) and
             (self.drainVoltage == other.drainVoltage)
-        ):
-            return True
-        else:
-            return False
+        )
 
 
 class ResultsHandler():
@@ -52,7 +49,9 @@ class ResultsHandler():
                 f"Results being saved in ./Measurements/{name}"
             )
             self.pickleFile = open(f"./Measurements/{name}/pickle.P", "wb")
-            self.excelFile = xlsxwriter.Workbook(f"./Measurements/{name}/Results.xlsx")
+            self.excelFile = xlsxwriter.Workbook(
+                f"./Measurements/{name}/Results.xlsx"
+            )
             self.csvFile = open(f"./Measurements/{name}/Raw.csv", "w+")
         else:
             raise NotImplementedError
@@ -111,7 +110,9 @@ class ResultsHandler():
             rowIndex = 1 + self.measurements.index(x)
             vgs = str(x.gateVoltage if x.gateVoltage is not None else "N/A")
             vds = str(x.drainVoltage if x.drainVoltage is not None else "N/A")
-            ids = str(x.drainCurrent * 1000 if x.drainCurrent is not None else "N/A")
+            ids = str(
+                x.drainCurrent * 1000 if x.drainCurrent is not None else "N/A"
+            )
             self.worksheet.write(rowIndex, 0, x.freq)
             self.worksheet.write(rowIndex, 1, x.inputPower)
             self.worksheet.write(rowIndex, 2, vgs)

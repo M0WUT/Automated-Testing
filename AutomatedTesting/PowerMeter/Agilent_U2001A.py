@@ -1,6 +1,6 @@
 from AutomatedTesting.PowerMeter.PowerMeter import PowerMeter
 import logging
-from time import sleep
+
 
 class Agilent_U2001A(PowerMeter):
     def __init__(self, address, name="Agilent U2001A"):

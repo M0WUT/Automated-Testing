@@ -1,7 +1,6 @@
 from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 import logging
 from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
-import struct
 
 
 class Agilent_E4407B(SpectrumAnalyser):
@@ -198,7 +197,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             assert 1 <= vbw < 5e6
             self._write(f"BAND:VID {readable_freq(vbw)}")
             logging.debug(
-               f"{self.name} set VBW to {readable_freq(freq)}"
+               f"{self.name} set VBW to {readable_freq(vbw)}"
             )
         else:
             if vbw.lower() == "auto":
@@ -208,7 +207,8 @@ class Agilent_E4407B(SpectrumAnalyser):
                 )
             else:
                 logging.error(
-                    f"Unable to set VBW of {self.name} to \"{vbw}\""
+                    f"Unable to set VBW of {self.name} to "
+                    f"\"{readable_freq(vbw)}\""
                 )
                 raise ValueError
 
@@ -301,5 +301,3 @@ class Agilent_E4407B(SpectrumAnalyser):
                 )
             index += 4
         return traceData
-
-
