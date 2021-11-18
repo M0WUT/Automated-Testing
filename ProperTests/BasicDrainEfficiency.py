@@ -109,12 +109,12 @@ class BasicDrainEfficiency(BaseTest):
 
         columnIndex = 4
 
-        if self.gateVoltage is not None:
+        if self.gateVoltage:
             ws.write(0, columnIndex, "Gate Voltage:")
             ws.write(0, columnIndex + 1, f"{self.gateVoltage}V")
             columnIndex += 3
 
-        if self.drainVoltage is not None:
+        if self.drainVoltage:
             ws.write(0, columnIndex, "Drain Voltage:")
             ws.write(0, columnIndex + 1, f"{self.drainVoltage}V")
             columnIndex += 3

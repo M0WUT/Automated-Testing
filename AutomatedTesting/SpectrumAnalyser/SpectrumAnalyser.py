@@ -36,6 +36,10 @@ class SpectrumAnalyser(BaseInstrument):
         super().__init__(address, id, name, **kwargs)
         self.corrections = None
 
+    def initialise(self, *args, **kwargs):
+        super().initialise(*args, **kwargs)
+        logging.info(f"{self.name} initialised")
+
     def set_centre_freq(self, freq):
         """
         Sets centre frequency
@@ -186,19 +190,3 @@ class SpectrumAnalyser(BaseInstrument):
             None
         """
         raise NotImplementedError  # pragma: no cover
-
-    def apply_corrections(self, corrections):
-        assert isinstance(corrections, PowerCorrections)
-        self.corrections = corrections
-
-    def _correct_power(self, power, freq=None):
-        if self.corrections is not None:
-            assert freq is not None
-            x = self.corrections.correctedPower(freq, power)
-        else:
-            x = power
-
-        logging.debug(
-                f"{self.name} measured power of {round(x, 1)}dBm"
-            )
-        return x

@@ -12,8 +12,7 @@ class InstrumentConnectionError(Exception):
 class InstrumentSupervisor():
     def __init__(self, loggingLevel=logging.WARNING):
         """
-        All test scripts should be implmented as a class which inherits this.
-        Implements all the setup / cleanup and error handling
+        Implements all the setup / cleanup and error handling of instruments
 
         Args:
             loggingLevel: level of detail which should be logged
@@ -99,7 +98,9 @@ class InstrumentSupervisor():
                 self.instruments.append(x)
             except InstrumentConnectionError:
                 raise InstrumentConnectionError(
-                    f"Failed to connect to {x.name} at {x.address}"
+                    f"Failed to connect to {x.name} at {x.address}. "
+                    f"Available resources: "
+                    f"{self.resourceManager.list_resources()}"
                 )
 
     def free_resource(self, instrument):

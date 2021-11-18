@@ -14,8 +14,8 @@ class SignalGeneratorChannel(InstrumentChannel):
         channelNumber (int): Channel Number on Signal Generator
         maxPower (float): Maximum Output Power (in dBm)
         minPower (float): Minimum Output Power (in dBm)
-        maxFreq (float): Maximum Carrier Frequency (in Hz)
-        minFreq (float): Minimum Carrier Frequency (in Hz)
+        maxFreq (int): Maximum Carrier Frequency (in Hz)
+        minFreq (int): Minimum Carrier Frequency (in Hz)
 
     Attributes:
         instrument (SignalGenerator): Signal Generator to which
@@ -35,11 +35,11 @@ class SignalGeneratorChannel(InstrumentChannel):
     """
     def __init__(
         self,
-        channelNumber,
-        maxPower,
-        minPower,
-        maxFreq,
-        minFreq
+        channelNumber: int,
+        maxPower: float,
+        minPower: float,
+        maxFreq: int,
+        minFreq: int
     ):
 
         if(maxPower < minPower):
@@ -81,13 +81,14 @@ class SignalGeneratorChannel(InstrumentChannel):
         self.maxFreq = self.absoluteMaxFreq
         self.minFreq = self.absoluteMinFreq
 
-    def set_power_limits(self, minPower, maxPower):
+    def set_power_limits(self, minPower: float, maxPower: float):
         """
         Allows tighter limits to be set on power than imposed by
         the instrument.
 
         Args:
-            None
+            minPower (float): Minimum allowed power in dBm
+            maxPower (float): Maximum allowed power in dBm
 
         Returns:
             None
@@ -114,13 +115,14 @@ class SignalGeneratorChannel(InstrumentChannel):
         self.maxPower = maxPower
         self.minPower = minPower
 
-    def set_freq_limits(self, minFreq, maxFreq):
+    def set_freq_limits(self, minFreq: int, maxFreq: int):
         """
         Allows tighter limits to be set on frequency than imposed by
         the instrument.
 
         Args:
-            None
+            minFreq: Minimum allowed frequency in Hz
+            maxFreq: Maximum allowed frequency in Hz
 
         Returns:
             None
@@ -170,7 +172,7 @@ class SignalGeneratorChannel(InstrumentChannel):
                 x = self.read_power()
                 assert x == power, \
                     f"{self.instrument.name}, " \
-                    f"Channel {self.name} failed to set power to " \
+                    f"Channel {self.get_name()} failed to set power to " \
                     f"{power}dBm. Readback value: {x}dBm"
 
                 self.powerSetpoint = power
@@ -183,7 +185,7 @@ class SignalGeneratorChannel(InstrumentChannel):
 
         logging.debug(
             f"{self.instrument.name}, "
-            f"{self.name} set to {power}dBm"
+            f"{self.get_name()} set to {power}dBm"
         )
 
     def read_power(self):
@@ -203,7 +205,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             self.channelNumber
         )
 
-    def set_freq(self, freq):
+    def set_freq(self, freq: int):
         """
         Sets channel carrier frequency
 
@@ -225,14 +227,14 @@ class SignalGeneratorChannel(InstrumentChannel):
                 if(x != freq):
                     logging.error(
                         f"{self.instrument.name}, "
-                        f"Channel {self.name} failed to set frequency to "
+                        f"Channel {self.get_name()} failed to set frequency to "
                         f"{readable_freq(freq)}. "
                         f"Readback value: {readable_freq(x)}"
                     )
 
                 logging.debug(
                     f"{self.instrument.name}, "
-                    f"Channel {self.name} set to {readable_freq(freq)}"
+                    f"Channel {self.get_name()} set to {readable_freq(freq)}"
                 )
                 self.freqSetpoint = freq
             else:
@@ -242,15 +244,15 @@ class SignalGeneratorChannel(InstrumentChannel):
                     f"Channel {self.channelNumber}"
                 )
 
-    def read_freq(self):
+    def read_freq(self) -> int:
         """
-        Reads channel output power
+        Reads channel frequency
 
         Args:
             None
 
         Returns:
-            power (float): channel output power in dBm
+            freq (int): Channel frequency in Hz
 
         Raises:
             None

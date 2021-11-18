@@ -23,55 +23,29 @@ class Agilent_E4407B(SpectrumAnalyser):
 
     def initialise(self, resourceManager, supervisor):
         super().initialise(resourceManager, supervisor)
-        if self.enableDisplay is False:
+        if not self.enableDisplay:
             self._write(":DISP:ENAB OFF")
 
-        if self.enableAutoAlign is False:
+        if not self.enableAutoAlign:
             self._write(":CAL:AUTO OFF")
 
-        if self.enableLowPhaseNoise is False:
+        if not self.enableLowPhaseNoise:
             self._write(":FREQ:SYNT 2")
 
         self._write(":INIT:CONT OFF")
 
-    def read_instrument_errors(self):
-        """
-        Checks whole instrument for errors
-
-        Args:
-            None
-
-        Returns:
-            list(Tuple): Pairs of (status code, error message)
-
-        Raises:
-            None
-        """
-        errorList = []
-        errors = self._query(":SYST:ERR?").strip()
-        if(errors != '+0,"No error"'):
-            errorStrings = errors.split('",')
-
-            for x in errorStrings:
-                errorCode, errorMessage = x.split(',"')
-                # Last item in list isn't comma terminated so need
-                # to manually remove trailing speech marks
-                if(errorMessage[-1:] == '"'):
-                    errorMessage = errorMessage[:-1]
-                errorList.append((int(errorCode), errorMessage))
-        return errorList
-
     def cleanup(self):
-        if self.enableDisplay is False:
+        if not self.enableDisplay:
             self._write(":DISP:ENAB ON")
 
-        if self.enableAutoAlign is False:
+        if not self.enableAutoAlign:
             self._write(":CAL:AUTO ON")
 
-        if self.enableLowPhaseNoise is False:
+        if not self.enableLowPhaseNoise:
             self._write(":FREQ:SYNT 3")
 
         self._write(":INIT:CONT ON")
+        super().cleanup()
 
     def set_centre_freq(self, freq):
         """
@@ -263,17 +237,19 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
+        
         self.set_span(0)
         self.set_rbw(1000)
         self.set_sweep_time(4)
         self.set_sweep_points(101)
+        
 
         self.set_centre_freq(freq)
-        self._write(":INIT:IMM;*WAI;:CALC:MARK1:MAX")
-        return self._correct_power(
-            float(self._query(":CALC:MARK1:Y?")),
-            freq
-        )
+        self._write(":INIT:IMM;*WAI")
+        self._write(":CALC:MARK:MAX")
+
+        measuredPower = self._query(":CALC:MARK:Y?").strip()
+        return float(measuredPower)
 
     def get_trace_data(self):
         traceData = []
@@ -285,8 +261,8 @@ class Agilent_E4407B(SpectrumAnalyser):
         )
         lengthOfLength = int(chr(data[1]))
         length = 0
-        lengthhBytes = data[2:(2+lengthOfLength)]
-        for x in lengthhBytes:
+        lengthBytes = data[2:(2 + lengthOfLength)]
+        for x in lengthBytes:
             length = length * 10 + int(chr(x))
 
         length = int(length / 4)  # 32 bit values so 4 bytes per value
@@ -301,3 +277,7 @@ class Agilent_E4407B(SpectrumAnalyser):
                 )
             index += 4
         return traceData
+
+    def check_instrument_errors(self, event):
+        logging.critical("Note that E4407B is not performing error checking")
+        # @TODO work out why checking errors causes seg faults

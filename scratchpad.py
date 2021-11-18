@@ -1,3 +1,4 @@
+from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 from ProperTests.BasicS21 import BasicS21
 from ProperTests.GainFlatnessWithSweptFrequency import \
     GainFlatnessWithSweptFrequency
@@ -8,7 +9,7 @@ from AutomatedTesting.TestDefinitions.TestSupervisor import TestSupervisor
 from AutomatedTesting.TestDefinitions.TestSetup import TestSetup, DUTLimits
 from time import sleep
 from AutomatedTesting.TopLevel.config import \
-    smb100a, u2001a, tenmaSingleChannel, sdg2122X
+    smb100a, u2001a, tenmaSingleChannel, sdg2122x, e4407b
 
 POWER_RANGE = arange(-50, 0, 0.5)
 FREQ_RANGE = arange(2.3e9, 2.6e9, 1e6)
@@ -52,19 +53,47 @@ eff = BasicDrainEfficiency(
 
 tests_to_perform = [s21, gainFlatness, eff]
 
-x = sdg2122X
+instruments = [sdg2122x, e4407b]
+#instruments = [sdg2122x, tenmaSingleChannel]
 
+
+freqList = [1e6, 10e6, 50e6, 100e6, 120e6]
 
 with TestSupervisor(
-    loggingLevel=logging.INFO, instruments=[x], calibrationPower=0, saveResults=False
+    loggingLevel=logging.INFO, instruments=instruments, calibrationPower=0, saveResults=False
 ) as supervisor:
-    channel = x.reserve_channel(1, "test")
-    channel.set_power(0)
-    channel.set_freq(1e6)
-    sleep(1)
-    assert False
+    signal = sdg2122x.reserve_channel(1, "test")
+    signal.set_freq(1e6)
+    signal.set_power(-50)
+    signal.enable_output()
+    print("Setpoint,", end='')
+    for x in freqList:
+        print(readable_freq(x) + ",", end='')
+    print("")
+
+    e4407b.set_span(1000)
+    e4407b.set_rbw(1000)
+    e4407b.set_sweep_points(101)
+    signal.set_power_limits(-60, -0)
+
+    for power in arange(-50, 1, 1):
+        signal.set_power(power)
+        print(f"{power},", end='')
+        for freq in freqList:
+            signal.set_freq(freq)
+            print(f"{e4407b.measure_power(freq)},", end='')
+        print("")
+            
+
+
+    
+
+
+
+    """
     for x in tests_to_perform:
         supervisor.request_measurements(x.generate_measurement_points())
     supervisor.run_measurements()
     for x in tests_to_perform:
         x.process_results(supervisor.results)
+    """

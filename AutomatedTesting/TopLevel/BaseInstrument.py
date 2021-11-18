@@ -5,6 +5,7 @@ from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 from multiprocessing import Lock
 from time import sleep
 import logging
+import gpib
 
 
 class BaseInstrument():
@@ -61,7 +62,7 @@ class BaseInstrument():
                 self.address,
                 **self.kwargs
             )
-        except pyvisa.VisaIOError:
+        except (pyvisa.VisaIOError, gpib.GpibError, ValueError, Exception):
             raise InstrumentConnectionError
 
         assert isinstance(supervisor, InstrumentSupervisor)
@@ -145,7 +146,6 @@ class BaseInstrument():
         Raises:
             None
         """
-        sleep(0.1)
         if(acquireLock):
             try:
                 self.lock.acquire()
@@ -170,7 +170,8 @@ class BaseInstrument():
         Raises:
             None
         """
-        return self.dev.read().strip()
+        response = self.dev.read().strip()
+        return response
 
     def _query(self, command):
         """
@@ -212,6 +213,32 @@ class BaseInstrument():
         finally:
             self.lock.release()
 
+    def read_instrument_errors(self):
+        """
+        Checks whole instrument for errors
+
+        Args:
+            None
+
+        Returns:
+            list(Tuple): Pairs of (status code, error message)
+
+        Raises:
+            None
+        """
+        errorList = []
+        errors = self._query(":SYST:ERR?")
+        if(errors != '+0,"No error"'):
+            errorStrings = errors.split('",')
+
+            for x in errorStrings:
+                errorCode, errorMessage = x.split(',"')
+                # Last item in list isn't comma terminated so need
+                # to manually remove trailing speech marks
+                errorMessage.rstrip("\"")
+                errorList.append((int(errorCode), errorMessage))
+        return errorList
+
     def check_instrument_errors(self, event):
         """
         Function that lives in separate thread to monitor
@@ -228,7 +255,7 @@ class BaseInstrument():
             None
         """
         while not event.is_set() and self.error is False:
-            sleep(1)
+            sleep(3)
             errorList = self.read_instrument_errors()
             if(errorList != []):
                 self.error = True

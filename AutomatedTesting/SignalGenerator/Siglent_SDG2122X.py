@@ -1,5 +1,17 @@
+# Standard library imports
+from __future__ import annotations
+from typing import TYPE_CHECKING
+import logging
+
+# Local imports
 from AutomatedTesting.SignalGenerator.SignalGenerator import \
     SignalGenerator, SignalGeneratorChannel
+
+# Type checking imports
+if TYPE_CHECKING:
+    from pyvisa import ResourceManager
+    from AutomatedTesting.TopLevel.InstrumentSupervisor import \
+        InstrumentSupervisor
 
 
 class Siglent_SDG2122X(SignalGenerator):
@@ -17,7 +29,7 @@ class Siglent_SDG2122X(SignalGenerator):
     Raises:
         None
     """
-    def __init__(self, address, name="SDG2122X"):
+    def __init__(self, address: str, name: str = "Siglent SDG2122X"):
 
         channel1 = SignalGeneratorChannel(
             channelNumber=1,
@@ -47,12 +59,16 @@ class Siglent_SDG2122X(SignalGenerator):
     # Inheritied function overrides #
     #################################
 
-    def initialise(self, resourceManager, supervisor):
+    def initialise(
+        self,
+        resourceManager: ResourceManager,
+        supervisor: InstrumentSupervisor
+    ):
         super().initialise(resourceManager, supervisor)
         self.set_output_load_50R()
         self.set_wavetype_sine()
 
-    def enable_channel_output(self, channelNumber, enabled):
+    def enable_channel_output(self, channelNumber: int, enabled: bool):
         """
         Enables / Disables channel output
 
@@ -67,11 +83,19 @@ class Siglent_SDG2122X(SignalGenerator):
             AssertionError: If enabled is not 0/1 or True/False
         """
         assert isinstance(enabled, bool)
-        self._write(
-            f"C{channelNumber} OUTP {1 if bool(enabled) else 0}"
-        )
+        if enabled:
+            self._write(f"C{channelNumber}:OUTP ON")
+        else:
+            self._write(f"C{channelNumber}:OUTP OFF")
+        assert self.get_channel_output_status(channelNumber) == enabled
 
-    def set_channel_power(self, channelNumber, power):
+    def get_channel_output_status(self, channelNumber: int) -> bool:
+        response = self._query(f"C{channelNumber}:OUTP?")
+        state = response.split("OUTP ")[1].split(",")[0]
+        return (state == "ON")
+
+
+    def set_channel_power(self, channelNumber: int, power: float):
         """
         Sets output power on requested channel
 
@@ -87,7 +111,7 @@ class Siglent_SDG2122X(SignalGenerator):
         """
         self._write(f"C{channelNumber}:BSWV AMPDBM,{power}")
 
-    def read_channel_power(self, channelNumber):
+    def read_channel_power(self, channelNumber: int):
         """
         Reads output power on requested channel
 
@@ -103,19 +127,19 @@ class Siglent_SDG2122X(SignalGenerator):
         channelStatus = self._query(f"C{channelNumber}:BSWV?")
         return float(channelStatus.split("AMPDBM,")[1].split("d")[0])
 
-    def set_channel_freq(self, channelNumber, freq):
+    def set_channel_freq(self, channelNumber: int, freq: int):
         assert round(freq) == freq, "Frequency must be integer number of Hz"
-        self._write(f"C{channelNumber}:BSWV FRQ,{freq}")
+        self._write(f"C{channelNumber}:BSWV FRQ,{int(freq)}")
 
-    def read_channel_freq(self, channelNumber):
+    def read_channel_freq(self, channelNumber: int):
         channelStatus = self._query(f"C{channelNumber}:BSWV?")
         freq = float(channelStatus.split("FRQ,")[1].split("HZ")[0])
         return freq
 
-    def set_channel_modulation(self, channelNumber, modulation):
+    def set_channel_modulation(self, channelNumber: int, modulation: str):
         raise NotImplementedError  # pragma: no cover
 
-    def read_channel_modulation(self, channelNumber):
+    def read_channel_modulation(self, channelNumber: int):
         raise NotImplementedError  # pragma: no cover
 
     def read_instrument_errors(self):
@@ -133,12 +157,12 @@ class Siglent_SDG2122X(SignalGenerator):
         """
         return []
 
-    def check_channel_errors(self, channelNumber):
-        # SMB100A has only 1 channel so no channel specific errors
+    def check_channel_errors(self, channelNumber: int):
+        # No channel specific errors
         pass
 
-    def close_remote_session(self):
-        super().close_remote_session()
+    def reserve_channel(self, *args, **kwargs) -> SignalGeneratorChannel:
+        return super().reserve_channel(*args, **kwargs)
 
     #############################
     # Device specific functions #
