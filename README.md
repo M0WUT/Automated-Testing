@@ -3,7 +3,7 @@
 ***
 
 ## Requirements
-```
+
 * Install pre-requisites (Based on https://xdevs.com/guide/ni_gpib_rpi/)
 ```
 sudo apt install fxload bc bison flex libssl-dev libncurses5-dev
