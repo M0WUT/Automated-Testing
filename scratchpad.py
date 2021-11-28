@@ -58,42 +58,62 @@ instruments = [sdg2122x, e4407b]
 
 
 freqList = [1e6, 10e6, 50e6, 100e6, 120e6]
+centreFreq = 50e6
+toneSpacing = 1e6
+lowerPower = -15
+upperPower = 10
+powerStep = 1
+measureIMD3 = True
+measureIMD5 = True
+measureIMD7 = True
 
 with TestSupervisor(
     loggingLevel=logging.INFO, instruments=instruments, calibrationPower=0, saveResults=False
 ) as supervisor:
-    signal = sdg2122x.reserve_channel(1, "test")
-    signal.set_freq(1e6)
-    signal.set_power(-50)
-    signal.enable_output()
-    print("Setpoint,", end='')
-    for x in freqList:
-        print(readable_freq(x) + ",", end='')
+    channel1 = sdg2122x.reserve_channel(1, "Channel 1")
+    channel2 = sdg2122x.reserve_channel(2, "Channel 2")
+    channel1.set_power(lowerPower)
+    channel2.set_power(lowerPower)
+    f1 = centreFreq - 0.5 * toneSpacing
+    f2 = centreFreq + 0.5 * toneSpacing
+    channel1.set_freq(f1)
+    channel2.set_freq(f2)
+    
+    channel1.enable_output()
+    channel2.enable_output()
+
+    # Setup Spectrum analyser
+    e4407b.set_ref_level(upperPower + 2)
+    e4407b.set_centre_freq(centreFreq)
+    e4407b.set_rbw(1000)
+
+    # Sanity check measurement
+    assert measureIMD3 or measureIMD5 or measureIMD7, \
+        "No Measurement Requested"
+
+    # Setup Headings
+    print("Power per Tone Setpoint(dBm),Tone-Upper (dBm),Tone-Lower (dBm),", end='')
+    if measureIMD3:
+        print("IMD3-Upper (dBm),IMD3-Lower (dBm),", end='')
+        e4407b.set_span(4 * toneSpacing)
+    if measureIMD5:
+        print("IMD5-Upper (dBm),IMD5-Lower (dBm),", end='')
+        e4407b.set_span(6 * toneSpacing)
+    if measureIMD7:
+        print("IMD7-Upper (dBm),IMD7-Lower (dBm),", end='')
+        e4407b.set_span(8 * toneSpacing)
     print("")
 
-    e4407b.set_span(1000)
-    e4407b.set_rbw(1000)
-    e4407b.set_sweep_points(101)
-    signal.set_power_limits(-60, -0)
 
-    for power in arange(-50, 1, 1):
-        signal.set_power(power)
-        print(f"{power},", end='')
-        for freq in freqList:
-            signal.set_freq(freq)
-            print(f"{e4407b.measure_power(freq)},", end='')
+    for power in range(lowerPower, upperPower + powerStep, powerStep):
+        channel1.set_power(power + 3.3)
+        channel2.set_power(power + 3.3)
+        e4407b._write(":INIT:IMM;*WAI")
+        print(f"{power},{e4407b.measure_power_marker(f2)},{e4407b.measure_power_marker(f1)},", end='')
+        if measureIMD3:
+            print(f"{e4407b.measure_power_marker(2*f2 - f1)},{e4407b.measure_power_marker(2*f1 - f2)},", end='')
+        if measureIMD5:
+            print(f"{e4407b.measure_power_marker(3*f2 - 2*f1)},{e4407b.measure_power_marker(3*f1 - 2*f2)},", end='')
+        if measureIMD7:
+            print(f"{e4407b.measure_power_marker(4*f2 - 3*f1)},{e4407b.measure_power_marker(4*f1 - 3*f2)},", end='')
         print("")
-            
-
-
-    
-
-
-
-    """
-    for x in tests_to_perform:
-        supervisor.request_measurements(x.generate_measurement_points())
-    supervisor.run_measurements()
-    for x in tests_to_perform:
-        x.process_results(supervisor.results)
-    """

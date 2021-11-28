@@ -62,7 +62,7 @@ class BaseInstrument():
                 self.address,
                 **self.kwargs
             )
-        except (pyvisa.VisaIOError, gpib.GpibError, ValueError, Exception):
+        except (pyvisa.errors.VisaIOError, gpib.GpibError, ValueError, Exception):
             raise InstrumentConnectionError
 
         assert isinstance(supervisor, InstrumentSupervisor)

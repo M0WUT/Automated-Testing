@@ -15,7 +15,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             name=name,
             minFreq=9e3,
             maxFreq=26.5e9,
-            timeout=10000
+            timeout=20000
         )
         self.enableDisplay = enableDisplay
         self.enableAutoAlign = enableAutoAlign
@@ -223,7 +223,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             f"{self.name} set sweep time to {sweepTime}ms"
         )
 
-    def measure_power(self, freq):
+    def measure_power_zero_span(self, freq):
         """
         Measures RF Power
 
@@ -237,19 +237,51 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        
+        self.set_ref_level(10)
         self.set_span(0)
         self.set_rbw(1000)
-        self.set_sweep_time(4)
         self.set_sweep_points(101)
         
-
         self.set_centre_freq(freq)
         self._write(":INIT:IMM;*WAI")
         self._write(":CALC:MARK:MAX")
+        measuredPower = float(self._query(":CALC:MARK:Y?").strip())
+        return measuredPower
+        
+    def measure_power_marker(self, freq):
+        """
+        Measures RF Power using a marker
 
-        measuredPower = self._query(":CALC:MARK:Y?").strip()
-        return float(measuredPower)
+        Args:
+            freq (float): Frequency of measured signal
+
+        Returns:
+            float: Measured power in dBm
+
+        Raises:
+            None
+        """
+        self._write(":CALC:MARK:STAT ON")
+        self._write(":CALC:MARK:MODE POS")
+        self._write(f":CALC:MARK:X {int(freq)}")
+        measuredPower = float(self._query(":CALC:MARK:Y?"))
+        return measuredPower
+
+        
+        
+
+    def set_ref_level(self, refLevel: int) -> None:
+        """
+        Sets reference level
+
+        Args:
+            refLevel: new reference level in dBm
+
+        Returns:
+            None
+        """
+        self._write(f":DISP:WIND:TRAC:Y:RLEV {refLevel}")
+        
 
     def get_trace_data(self):
         traceData = []
@@ -279,5 +311,5 @@ class Agilent_E4407B(SpectrumAnalyser):
         return traceData
 
     def check_instrument_errors(self, event):
-        logging.critical("Note that E4407B is not performing error checking")
+        logging.warning("Note that E4407B is not performing error checking")
         # @TODO work out why checking errors causes seg faults

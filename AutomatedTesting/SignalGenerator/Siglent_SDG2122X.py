@@ -34,7 +34,7 @@ class Siglent_SDG2122X(SignalGenerator):
         channel1 = SignalGeneratorChannel(
             channelNumber=1,
             maxPower=30,
-            minPower=-145,
+            minPower=-60,
             maxFreq=120e6,
             minFreq=1e-6
         )
@@ -42,7 +42,7 @@ class Siglent_SDG2122X(SignalGenerator):
         channel2 = SignalGeneratorChannel(
             channelNumber=2,
             maxPower=30,
-            minPower=-145,
+            minPower=-60,
             maxFreq=120e6,
             minFreq=1e-6
         )
