@@ -35,7 +35,8 @@ svn checkout svn://svn.code.sf.net/p/linux-gpib/code/trunk linux-gpib-code
 ```
 
 * Make Kernel modules
-```cd linux-gpib-kernel
+```
+cd linux-gpib-code/linux-gpib-kernel
 make 
 sudo make install
 ```
@@ -83,7 +84,7 @@ interface {
 ```
 wget https://linux-gpib.sourceforge.io/firmware/gpib_firmware-2008-08-10.tar.gz
 tar -xf gpib_firmware-2008-08-10.tar.gz
-cd gpib_firmware-2008-08-10.tar.gz
+cd gpib_firmware-2008-08-10
 sudo cp -r ni_gpib_usb_b /lib/firmware/ni_usb_gpib
 
 ```
