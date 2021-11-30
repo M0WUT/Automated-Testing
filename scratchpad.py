@@ -1,119 +1,130 @@
-from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
-from ProperTests.BasicS21 import BasicS21
-from ProperTests.GainFlatnessWithSweptFrequency import \
-    GainFlatnessWithSweptFrequency
-from ProperTests.BasicDrainEfficiency import BasicDrainEfficiency
-from numpy import arange
 import logging
+from AutomatedTesting.SignalGenerator.SignalGenerator import SignalGenerator, SignalGeneratorChannel
+from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 from AutomatedTesting.TestDefinitions.TestSupervisor import TestSupervisor
-from AutomatedTesting.TestDefinitions.TestSetup import TestSetup, DUTLimits
-from time import sleep
-from AutomatedTesting.TopLevel.config import \
-    smb100a, u2001a, tenmaSingleChannel, sdg2122x, e4407b
-
-POWER_RANGE = arange(-50, 0, 0.5)
-FREQ_RANGE = arange(2.3e9, 2.6e9, 1e6)
-DEFAULT_FREQ = 2.4e9
-DEFAULT_DRAIN_VOLTAGE = 24
-
-limits = DUTLimits(
-    minFreq=2e9,
-    maxFreq=3e9,
-    maxInputPower=18,
-    maxDrainVoltage=24,
-    maxDrainCurrent=1.5
-)
-
-testSetup = TestSetup(
-    signalSource=smb100a,
-    signalSourceChannel=1,
-    signalSink=u2001a,
-    dutLimits=limits,
-    drainSupply=tenmaSingleChannel,
-    drainSupplyChannel=1
-)
-
-s21 = BasicS21(
-    freqRange=FREQ_RANGE,
-    measurementPower=-10,
-    drainVoltage=DEFAULT_DRAIN_VOLTAGE
-)
-
-gainFlatness = GainFlatnessWithSweptFrequency(
-    powerRange=POWER_RANGE,
-    freqRange=[2.4e9, 2.45e9, 2.5e9],
-    drainVoltage=DEFAULT_DRAIN_VOLTAGE
-)
-
-eff = BasicDrainEfficiency(
-    powerRange=POWER_RANGE,
-    measurementFreq=DEFAULT_FREQ,
-    drainVoltage=DEFAULT_DRAIN_VOLTAGE
-)
-
-tests_to_perform = [s21, gainFlatness, eff]
-
-instruments = [sdg2122x, e4407b]
-#instruments = [sdg2122x, tenmaSingleChannel]
+from AutomatedTesting.TopLevel.config import sdg2122x, e4407b
+import argparse
+from typing import List
 
 
-freqList = [1e6, 10e6, 50e6, 100e6, 120e6]
-centreFreq = 50e6
-toneSpacing = 1e6
-lowerPower = -15
-upperPower = 10
-powerStep = 1
-measureIMD3 = True
-measureIMD5 = True
-measureIMD7 = True
+def main(
+    freqList: List[int],
+    toneSpacing: int,
+    spectrumAnalyser: SpectrumAnalyser,
+    signalGenerator: SignalGenerator,
+    signalGeneratorChannels: List[int],
+    lowerPowerLimit: float,
+    upperPowerLimit: float,
+    refLevel: float,
+    measureIMD3: bool = True,
+    measureIMD5: bool = False,
+    measureIMD7: bool = False
+):
+    assert len(signalGeneratorChannels) == 2, \
+        "Exactly 2 channel numbers must be specified"
+    sa = spectrumAnalyser
+    with TestSupervisor(
+        loggingLevel=logging.DEBUG,
+        instruments=[sa, signalGenerator],
+        calibrationPower=0,
+        saveResults=False
+    ) as _:
+        channel1 = signalGenerator.reserve_channel(
+            signalGeneratorChannels[0], "Lower IMD Tone"
+        )
+        channel2 = signalGenerator.reserve_channel(
+            signalGeneratorChannels[1], "Upper IMD Tone"
+        )
+        channel1.set_power(lowerPowerLimit)
+        channel2.set_power(lowerPowerLimit)
 
-with TestSupervisor(
-    loggingLevel=logging.INFO, instruments=instruments, calibrationPower=0, saveResults=False
-) as supervisor:
-    channel1 = sdg2122x.reserve_channel(1, "Channel 1")
-    channel2 = sdg2122x.reserve_channel(2, "Channel 2")
-    channel1.set_power(lowerPower)
-    channel2.set_power(lowerPower)
-    f1 = centreFreq - 0.5 * toneSpacing
-    f2 = centreFreq + 0.5 * toneSpacing
-    channel1.set_freq(f1)
-    channel2.set_freq(f2)
-    
-    channel1.enable_output()
-    channel2.enable_output()
+        # Setup Spectrum analyser
+        sa.set_ref_level(refLevel)
+        sa.set_rbw(1000)
 
-    # Setup Spectrum analyser
-    e4407b.set_ref_level(upperPower + 2)
-    e4407b.set_centre_freq(centreFreq)
-    e4407b.set_rbw(1000)
+        # Sanity check measurement
+        assert measureIMD3 or measureIMD5 or measureIMD7, \
+            "No Measurement Requested"
 
-    # Sanity check measurement
-    assert measureIMD3 or measureIMD5 or measureIMD7, \
-        "No Measurement Requested"
-
-    # Setup Headings
-    print("Power per Tone Setpoint(dBm),Tone-Upper (dBm),Tone-Lower (dBm),", end='')
-    if measureIMD3:
-        print("IMD3-Upper (dBm),IMD3-Lower (dBm),", end='')
-        e4407b.set_span(4 * toneSpacing)
-    if measureIMD5:
-        print("IMD5-Upper (dBm),IMD5-Lower (dBm),", end='')
-        e4407b.set_span(6 * toneSpacing)
-    if measureIMD7:
-        print("IMD7-Upper (dBm),IMD7-Lower (dBm),", end='')
-        e4407b.set_span(8 * toneSpacing)
-    print("")
-
-
-    for power in range(lowerPower, upperPower + powerStep, powerStep):
-        channel1.set_power(power + 3.3)
-        channel2.set_power(power + 3.3)
-        e4407b._write(":INIT:IMM;*WAI")
-        print(f"{power},{e4407b.measure_power_marker(f2)},{e4407b.measure_power_marker(f1)},", end='')
+        # Setup Headings
+        print(
+            "Power per Tone Setpoint(dBm),Tone-Upper (dBm),Tone-Lower (dBm),",
+            end=''
+        )
         if measureIMD3:
-            print(f"{e4407b.measure_power_marker(2*f2 - f1)},{e4407b.measure_power_marker(2*f1 - f2)},", end='')
+            print("IMD3-Upper (dBm),IMD3-Lower (dBm),", end='')
+            sa.set_span(4 * toneSpacing)
         if measureIMD5:
-            print(f"{e4407b.measure_power_marker(3*f2 - 2*f1)},{e4407b.measure_power_marker(3*f1 - 2*f2)},", end='')
+            print("IMD5-Upper (dBm),IMD5-Lower (dBm),", end='')
+            sa.set_span(6 * toneSpacing)
         if measureIMD7:
-            print(f"{e4407b.measure_power_marker(4*f2 - 3*f1)},{e4407b.measure_power_marker(4*f1 - 3*f2)},", end='')
+            print("IMD7-Upper (dBm),IMD7-Lower (dBm),", end='')
+            sa.set_span(8 * toneSpacing)
         print("")
+
+        for freq in freqList:
+            f1 = freq - 0.5 * toneSpacing
+            f2 = freq + 0.5 * toneSpacing
+            channel1.set_freq(f1)
+            channel2.set_freq(f2)
+
+            # Get Noise Floor with no tones
+            # This allows for faster sweeping by ignoring points
+            # with negligible IMD
+            noiseFloor = sa.measure_power_marker(f1)
+
+            channel1.enable_output()
+            channel2.enable_output()
+
+            power = lowerPowerLimit
+            while(power < upperPowerLimit):
+                channel1.set_power(power + 3.3)
+                channel2.set_power(power + 3.3)
+                sa.trigger_measurement()
+                print(f"{power},", end='')
+                print(f"{sa.measure_power_marker(f2)},", end='')
+                print(f"{sa.measure_power_marker(f1)},", end='')
+                if measureIMD3:
+                    print(f"{sa.measure_power_marker(2*f2 - f1)},", end='')
+                    print(f"{sa.measure_power_marker(2*f1 - f2)},", end='')
+                if measureIMD5:
+                    print(f"{sa.measure_power_marker(3*f2 - 2*f1)},", end='')
+                    print(f"{sa.measure_power_marker(3*f1 - 2*f2)},", end='')
+                if measureIMD7:
+                    print(f"{sa.measure_power_marker(4*f2 - 3*f1)},", end='')
+                    print(f"{sa.measure_power_marker(4*f1 - 3*f2)},", end='')
+                print("")
+
+            # Go in 5dB steps if negligible IMD, in 1dB steps if significant
+            if sa.measure_power_marker(2*f2 - f1) - noiseFloor < 5:
+                power += 5
+            else:
+                power += 1
+
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--freqs",
+        nargs="*",
+        type=int
+    )
+    parser.add_argument(
+        "--toneSpacing",
+        type=int,
+        default=0
+    )
+
+    args = parser.parse_args()
+    
+    main(
+        freqList=[x * 1e6 for x in args.freqs],
+        toneSpacing=args.toneSpacing,
+        spectrumAnalyser=e4407b,
+        signalGenerator=sdg2122x,
+        signalGeneratorChannels=[1, 2],
+        lowerPowerLimit=-40,
+        upperPowerLimit=-10,
+        refLevel=25
+    )

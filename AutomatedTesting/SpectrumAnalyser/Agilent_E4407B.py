@@ -47,6 +47,9 @@ class Agilent_E4407B(SpectrumAnalyser):
         self._write(":INIT:CONT ON")
         super().cleanup()
 
+    def trigger_measurement(self):
+        self._write(":INIT:IMM;*WAI")
+
     def set_centre_freq(self, freq):
         """
         Sets centre frequency
