@@ -29,6 +29,13 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
         )
         self.hiddenColumns.append(self.currentColumn)
 
+    def hide_current_row(self) -> None:
+        self.set_row(
+            self.currentRow,
+            None, None, {'hidden': True}
+        )
+        self.hiddenColumns.append(self.currentColumn)
+
     def new_row(self):
         self.currentColumn = 0
         self.maxRow = max(self.maxRow, self.currentRow)
