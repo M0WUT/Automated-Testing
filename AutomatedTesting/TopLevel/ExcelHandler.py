@@ -41,10 +41,20 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
         self.maxRow = max(self.maxRow, self.currentRow)
         self.currentRow += 1
 
+    def new_column(self):
+        self.currentRow = 0
+        self.maxColumn = max(self.maxColumn, self.currentColumn)
+        self.currentColumn += 1
+
     def write_and_move_right(self, x):
         self.write(self.currentRow, self.currentColumn, x)
         self.maxColumn = max(self.maxColumn, self.currentColumn)
         self.currentColumn += 1
+
+    def write_and_move_down(self, x):
+        self.write(self.currentRow, self.currentColumn, x)
+        self.maxRow = max(self.maxRow, self.currentRow)
+        self.currentRow += 1
 
     def save_headers_row(self):
         self.headersRow = self.currentRow

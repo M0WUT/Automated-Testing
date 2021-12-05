@@ -221,10 +221,13 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        self._write(f":SWE:TIME {sweepTime}ms")
-        logging.debug(
-            f"{self.name} set sweep time to {sweepTime}ms"
-        )
+        if sweepTime == 'auto':
+            self._write(":SWE:TIME:AUTO ON")
+        else:
+            self._write(f":SWE:TIME {sweepTime}ms")
+            logging.debug(
+                f"{self.name} set sweep time to {sweepTime}ms"
+            )
 
     def measure_power_zero_span(self, freq):
         """
@@ -240,17 +243,16 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        self.set_ref_level(10)
         self.set_span(0)
-        self.set_rbw(1000)
-        self.set_sweep_points(101)
-        
+        self.set_sweep_points(101)  
+        self.set_sweep_time(10)
+
         self.set_centre_freq(freq)
-        self._write(":INIT:IMM;*WAI")
+        self.trigger_measurement()
         self._write(":CALC:MARK:MAX")
         measuredPower = float(self._query(":CALC:MARK:Y?").strip())
         return measuredPower
-        
+
     def measure_power_marker(self, freq):
         """
         Measures RF Power using a marker
