@@ -74,7 +74,23 @@ def best_fit_line_with_known_gradient(
     x = copy(xValues)
     y = copy(yValues)
 
-    while len(x) >= 2:
+    # Distortion is probably at the start / end due to
+    # noise floor / compression so run a rough check on points
+    # with pairwise gradient that's completely outside of spec
+    try:
+        while abs(((y[1] - y[0]) / (x[1] - x[0])) - expectedGradient) > 1:
+            x = x[1:]
+            y = y[1:]
+    except IndexError:
+        return None
+    try:
+        while abs(((y[-1] - y[-2]) / (x[-1] - x[-2])) - expectedGradient) > 1:
+            x = x[:-1]
+            y = y[:-1]
+    except IndexError:
+        return None
+
+    while len(x) >= 4:
         # Best fit line
         gradient, intercept = numpy.polyfit(
             numpy.array(x),
@@ -86,10 +102,6 @@ def best_fit_line_with_known_gradient(
             gradient <= (1 + maxErrorPercentage / 100) * expectedGradient
         ):
             # We've found a solution
-            if len(x) < 4:
-                logging.warning(
-                    "Interpolation of line completed with fewer than 4 points"
-                )
             return StraightLine(
                 round(gradient, 4), round(intercept, 4)
             )

@@ -219,7 +219,7 @@ def main(
             worksheet.hide_current_column()
             toneBestFitColumn = worksheet.currentColumn
             worksheet.write_and_move_right("Tone - Upper (Best Fit)")
-  
+
         else:
             logging.critical("Upper test tone isn't linear")
 
@@ -364,7 +364,7 @@ def main(
                 if lowerIMD3BestFit:
                     worksheet.write_and_move_right(
                         lowerIMD3BestFit.evaluate(x.toneSetpoint)
-                    )               
+                    )
 
             # IMD5
             if measuredIMD5:
@@ -533,7 +533,7 @@ def main(
                 'name':         "IPn",
                 'categories':   categoryString,
                 'values':       valueString,
-                'line':         {'dash_type': 'round_dot'},
+                'line':         {'none': True},
                 'marker':       {
                                     'type': 'square',
                                     'size': 5,
@@ -544,7 +544,7 @@ def main(
                                     'custom': ipnLabels,
                                     'position': 'below',
                                     'border': {'color': 'red'},
-                                    'fill':   {'color': 'yellow'}
+                                    'fill':   {'color': 'yellow'},
                                 }
             })
 
