@@ -2,7 +2,6 @@ import logging
 from multiprocessing import Lock
 from time import sleep
 
-import gpib
 import pyvisa
 from AutomatedTesting.TopLevel.InstrumentSupervisor import (
     InstrumentConnectionError,
@@ -62,7 +61,7 @@ class BaseInstrument:
 
         try:
             self.dev = resourceManager.open_resource(self.address, **self.kwargs)
-        except (pyvisa.errors.VisaIOError, gpib.GpibError, ValueError, Exception):
+        except (pyvisa.errors.VisaIOError, ValueError, Exception):
             raise InstrumentConnectionError
 
         assert isinstance(supervisor, InstrumentSupervisor)
@@ -228,7 +227,7 @@ class BaseInstrument:
             None
         """
         errorList = []
-        errors = self._query(":SYST:ERR?")
+        errors = self._query("SYST:ERR?")
         if errors != '+0,"No error"':
             errorStrings = errors.split('",')
 
@@ -293,7 +292,7 @@ class BaseInstrument:
     def close_remote_session(self):
         """
         Final actions before connection is closed.
-        Override if final commands after e.g. channel cleanup
+        Override if final commands after channel cleanup
         are needed i.e. to return the device to local control
 
         Args:

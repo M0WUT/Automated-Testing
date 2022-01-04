@@ -57,7 +57,8 @@ class Agilent_E4407B(SpectrumAnalyser):
         try:
             self._write(":INIT:IMM", acquireLock=False)
             while self._query("*OPC?", acquireLock=False) == "1":
-                sleep(0.1)
+                logging.critical("SLEEPING")
+                sleep(1)
         finally:
             self.lock.release()
 
@@ -274,7 +275,7 @@ class Agilent_E4407B(SpectrumAnalyser):
 
     def get_trace_data(self):
         traceData = []
-        self._write(":INIT:IMM;*WAI;")
+        self.trigger_measurement()
 
         # First number is how many digits are in length field
         data = self._query_raw(":TRAC? TRACE1")
@@ -294,3 +295,18 @@ class Agilent_E4407B(SpectrumAnalyser):
             )
             index += 4
         return traceData
+
+    def read_instrument_errors(self):
+        """
+        Checks whole instrument for errors
+
+        Args:
+            None
+
+        Returns:
+            list(Tuple): Pairs of (status code, error message)
+
+        Raises:
+            None
+        """
+        return []

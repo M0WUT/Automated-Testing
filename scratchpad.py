@@ -9,14 +9,19 @@ from typing import List, Union
 import xlsxwriter
 
 from AutomatedTesting.SignalGenerator.SignalGenerator import (
-    SignalGenerator, SignalGeneratorChannel)
+    SignalGenerator,
+    SignalGeneratorChannel,
+)
 from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 from AutomatedTesting.TestDefinitions.TestSupervisor import TestSupervisor
 from AutomatedTesting.TopLevel.config import e4407b, sdg2122x
 from AutomatedTesting.TopLevel.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.TopLevel.UsefulFunctions import (
-    StraightLine, best_fit_line_with_known_gradient, intercept_point,
-    readable_freq)
+    StraightLine,
+    best_fit_line_with_known_gradient,
+    intercept_point,
+    readable_freq,
+)
 
 
 @dataclass
@@ -319,9 +324,9 @@ def main(
 
             print([x.toneSetpoint for x in datapoints])
             print([x.imdPoints[imdTone] for x in datapoints])
-            print(f"{imdTone=}")
-            print(f"{measuredIPn.upperBestFit=}")
-            print(f"{measuredIPn.lowerBestFit=}")
+            print(f"{imdTone}")
+            print(f"{measuredIPn.upperBestFit}")
+            print(f"{measuredIPn.lowerBestFit}")
 
             if measuredIPn.lowerBestFit:
                 worksheet.hide_current_column()
@@ -796,7 +801,7 @@ if __name__ == "__main__":
             lowerPowerLimit=-40,
             upperPowerLimit=-10,
             refLevel=25,
-            pickleFile="imdTest.P",
+            # pickleFile="imdTest.P",
         )
     except KeyboardInterrupt:
         pass

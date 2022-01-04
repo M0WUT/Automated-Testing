@@ -1,15 +1,16 @@
-import pyvisa
+import logging
 import os
 import signal
 import sys
-import logging
+
+import pyvisa
 
 
 class InstrumentConnectionError(Exception):
     pass
 
 
-class InstrumentSupervisor():
+class InstrumentSupervisor:
     def __init__(self, loggingLevel=logging.WARNING):
         """
         Implements all the setup / cleanup and error handling of instruments
@@ -25,10 +26,9 @@ class InstrumentSupervisor():
         """
         self.instruments = []
         logging.basicConfig(
-            format='%(levelname)s: %(asctime)s %(message)s',
-            level=loggingLevel
+            format="%(levelname)s: %(asctime)s %(message)s", level=loggingLevel
         )
-        self.resourceManager = pyvisa.ResourceManager('@py')
+        self.resourceManager = pyvisa.ResourceManager("@py")
         self.mainThread = os.getpid()
         self.shutdown = False
         signal.signal(signal.SIGUSR1, self.signal_handler)
@@ -54,10 +54,10 @@ class InstrumentSupervisor():
         Raises:
             None
         """
-        while(self.instruments != []):
+        while self.instruments != []:
             self.free_resource(self.instruments[0])
 
-    def signal_handler(self, a, b):
+    def signal_handler(self, *args, **kwargs):
         """
         Catches all signals indicating instrument faults
         Shutdown is long enough that same error may be
@@ -73,8 +73,9 @@ class InstrumentSupervisor():
         Raises:
             None
         """
-        if self.shutdown is False:
+        if not self.shutdown:
             self.shutdown = True
+            self.cleanup()
             sys.exit(1)
         else:
             pass
