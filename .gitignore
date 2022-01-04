@@ -6,3 +6,6 @@
 Measurements/*
 *.coverage*
 linux-gpib/*
+*.P
+*.p
+*.xlsx

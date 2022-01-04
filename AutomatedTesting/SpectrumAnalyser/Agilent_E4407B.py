@@ -1,13 +1,18 @@
-from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 import logging
+from time import sleep
+
+from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 from AutomatedTesting.TopLevel.UsefulFunctions import readable_freq
 
 
 class Agilent_E4407B(SpectrumAnalyser):
     def __init__(
-        self, address, name="Agilent E4407B",
-        enableDisplay=False, enableAutoAlign=True,
-        enableLowPhaseNoise=False
+        self,
+        address,
+        name="Agilent E4407B",
+        enableDisplay=False,
+        enableAutoAlign=True,
+        enableLowPhaseNoise=False,
     ):
         super().__init__(
             address,
@@ -15,7 +20,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             name=name,
             minFreq=9e3,
             maxFreq=26.5e9,
-            timeout=20000
+            timeout=20000,
         )
         self.enableDisplay = enableDisplay
         self.enableAutoAlign = enableAutoAlign
@@ -48,7 +53,13 @@ class Agilent_E4407B(SpectrumAnalyser):
         super().cleanup()
 
     def trigger_measurement(self):
-        self._write(":INIT:IMM;*WAI")
+        self.lock.acquire()
+        try:
+            self._write(":INIT:IMM", acquireLock=False)
+            while self._query("*OPC?", acquireLock=False) == "1":
+                sleep(0.1)
+        finally:
+            self.lock.release()
 
     def set_centre_freq(self, freq):
         """
@@ -65,9 +76,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         assert 0 < freq < 26.5e9
         self._write(f"FREQ:CENT {readable_freq(freq)}")
-        logging.debug(
-            f"{self.name} set centre frequency to {readable_freq(freq)}"
-        )
+        logging.debug(f"{self.name} set centre frequency to {readable_freq(freq)}")
 
     def set_start_freq(self, freq):
         """
@@ -84,9 +93,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         assert 0 < freq < 26.5e9
         self._write(f"FREQ:STAR {readable_freq(freq)}")
-        logging.debug(
-            f"{self.name} set start frequency to {readable_freq(freq)}"
-        )
+        logging.debug(f"{self.name} set start frequency to {readable_freq(freq)}")
 
     def set_stop_freq(self, freq):
         """
@@ -103,9 +110,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         assert 0 < freq < 26.5e9
         self._write(f"FREQ:STOP {readable_freq(freq)}")
-        logging.debug(
-            f"{self.name} set stop frequency to {readable_freq(freq)}"
-        )
+        logging.debug(f"{self.name} set stop frequency to {readable_freq(freq)}")
 
     def set_span(self, freq):
         """
@@ -122,9 +127,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         assert 100 < freq < 26.5e9 or freq == 0
         self._write(f"FREQ:SPAN {readable_freq(freq)}")
-        logging.debug(
-            f"{self.name} set span to {readable_freq(freq)}"
-        )
+        logging.debug(f"{self.name} set span to {readable_freq(freq)}")
 
     def set_rbw(self, rbw):
         """
@@ -142,19 +145,13 @@ class Agilent_E4407B(SpectrumAnalyser):
         if isinstance(rbw, int):
             assert 1 <= rbw < 5e6
             self._write(f"BAND {readable_freq(rbw)}")
-            logging.debug(
-               f"{self.name} set RBW to {readable_freq(rbw)}"
-            )
+            logging.debug(f"{self.name} set RBW to {readable_freq(rbw)}")
         else:
             if rbw.lower() == "auto":
                 self._write("BAND:AUTO ON")
-                logging.debug(
-                   f"{self.name} set RBW to auto"
-                )
+                logging.debug(f"{self.name} set RBW to auto")
             else:
-                logging.error(
-                    f"Unable to set RBW of {self.name} to \"{rbw}\""
-                )
+                logging.error(f'Unable to set RBW of {self.name} to "{rbw}"')
                 raise ValueError
 
     def set_vbw(self, vbw):
@@ -173,19 +170,14 @@ class Agilent_E4407B(SpectrumAnalyser):
         if isinstance(vbw, int):
             assert 1 <= vbw < 5e6
             self._write(f"BAND:VID {readable_freq(vbw)}")
-            logging.debug(
-               f"{self.name} set VBW to {readable_freq(vbw)}"
-            )
+            logging.debug(f"{self.name} set VBW to {readable_freq(vbw)}")
         else:
             if vbw.lower() == "auto":
                 self._write("BAND:VID:AUTO ON")
-                logging.debug(
-                    f"{self.name} set VBW to auto"
-                )
+                logging.debug(f"{self.name} set VBW to auto")
             else:
                 logging.error(
-                    f"Unable to set VBW of {self.name} to "
-                    f"\"{readable_freq(vbw)}\""
+                    f"Unable to set VBW of {self.name} to " f'"{readable_freq(vbw)}"'
                 )
                 raise ValueError
 
@@ -204,9 +196,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         assert 101 <= numPoints <= 8192
         self._write(f":SWE:POIN {numPoints}")
-        logging.debug(
-            f"{self.name} set number of points to {numPoints}"
-        )
+        logging.debug(f"{self.name} set number of points to {numPoints}")
 
     def set_sweep_time(self, sweepTime):
         """
@@ -221,13 +211,11 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        if sweepTime == 'auto':
+        if sweepTime == "auto":
             self._write(":SWE:TIME:AUTO ON")
         else:
             self._write(f":SWE:TIME {sweepTime}ms")
-            logging.debug(
-                f"{self.name} set sweep time to {sweepTime}ms"
-            )
+            logging.debug(f"{self.name} set sweep time to {sweepTime}ms")
 
     def measure_power_zero_span(self, freq):
         """
@@ -244,7 +232,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             None
         """
         self.set_span(0)
-        self.set_sweep_points(101)  
+        self.set_sweep_points(101)
         self.set_sweep_time(10)
 
         self.set_centre_freq(freq)
@@ -272,9 +260,6 @@ class Agilent_E4407B(SpectrumAnalyser):
         measuredPower = float(self._query(":CALC:MARK:Y?"))
         return measuredPower
 
-        
-        
-
     def set_ref_level(self, refLevel: int) -> None:
         """
         Sets reference level
@@ -286,19 +271,16 @@ class Agilent_E4407B(SpectrumAnalyser):
             None
         """
         self._write(f":DISP:WIND:TRAC:Y:RLEV {refLevel}")
-        
 
     def get_trace_data(self):
         traceData = []
         self._write(":INIT:IMM;*WAI;")
 
         # First number is how many digits are in length field
-        data = self._query_raw(
-            ":TRAC? TRACE1"
-        )
+        data = self._query_raw(":TRAC? TRACE1")
         lengthOfLength = int(chr(data[1]))
         length = 0
-        lengthBytes = data[2:(2 + lengthOfLength)]
+        lengthBytes = data[2 : (2 + lengthOfLength)]
         for x in lengthBytes:
             length = length * 10 + int(chr(x))
 
@@ -306,15 +288,9 @@ class Agilent_E4407B(SpectrumAnalyser):
         index = 2 + lengthOfLength  # First index worth reading
 
         for x in range(length):
-            dataPoint = data[index:index + 4]
+            dataPoint = data[index : index + 4]
             traceData.append(
-                int.from_bytes(
-                    dataPoint, byteorder="big", signed=True
-                    ) / 1000
-                )
+                int.from_bytes(dataPoint, byteorder="big", signed=True) / 1000
+            )
             index += 4
         return traceData
-
-    def check_instrument_errors(self, event):
-        logging.warning("Note that E4407B is not performing error checking")
-        # @TODO work out why checking errors causes seg faults

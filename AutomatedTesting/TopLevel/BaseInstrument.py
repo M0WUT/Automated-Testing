@@ -1,14 +1,17 @@
-import pyvisa
-from AutomatedTesting.TopLevel.InstrumentSupervisor import \
-    InstrumentSupervisor, InstrumentConnectionError
-from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
+import logging
 from multiprocessing import Lock
 from time import sleep
-import logging
+
 import gpib
+import pyvisa
+from AutomatedTesting.TopLevel.InstrumentSupervisor import (
+    InstrumentConnectionError,
+    InstrumentSupervisor,
+)
+from AutomatedTesting.TopLevel.ProcessWIthCleanStop import ProcessWithCleanStop
 
 
-class BaseInstrument():
+class BaseInstrument:
     def __init__(self, address, id, name, **kwargs):
         """
         Parent class for all Test Equipment
@@ -58,10 +61,7 @@ class BaseInstrument():
         assert isinstance(resourceManager, pyvisa.highlevel.ResourceManager)
 
         try:
-            self.dev = resourceManager.open_resource(
-                self.address,
-                **self.kwargs
-            )
+            self.dev = resourceManager.open_resource(self.address, **self.kwargs)
         except (pyvisa.errors.VisaIOError, gpib.GpibError, ValueError, Exception):
             raise InstrumentConnectionError
 
@@ -69,7 +69,7 @@ class BaseInstrument():
         self.supervisor = supervisor
 
         x = self.read_id().strip()
-        if(x != self.id):
+        if x != self.id:
             logging.error(
                 f"ID check failed on {self.name}. "
                 f"Expected ID: {self.id} "
@@ -80,7 +80,7 @@ class BaseInstrument():
         self.reset()
 
         errorList = self.read_instrument_errors()
-        while(errorList != []):
+        while errorList != []:
             for code, message in errorList:
                 logging.warning(
                     f"{self.name} reporting error {code} ({message}). "
@@ -89,15 +89,11 @@ class BaseInstrument():
             sleep(1)
             errorList = self.read_instrument_errors()
 
-        logging.debug(
-            f"Starting monitoring thread for Instrument: {self.name}"
-        )
-        self.errorThread = ProcessWithCleanStop(
-                target=self.check_instrument_errors
-            )
+        logging.debug(f"Starting monitoring thread for Instrument: {self.name}")
+        self.errorThread = ProcessWithCleanStop(target=self.check_instrument_errors)
         self.errorThread.start()
 
-    def read_id(self):
+    def read_id(self) -> str:
         """
         Queries Device ID
 
@@ -128,7 +124,7 @@ class BaseInstrument():
         self._write("*RST")  # Reset device
         self._write("*CLS")  # Clear errors
 
-    def _write(self, command, acquireLock=True):
+    def _write(self, command: str, acquireLock: bool = True):
         """
         Writes Data to Instrument - needs sleep otherwise data gets dropped
         in some cases
@@ -146,9 +142,9 @@ class BaseInstrument():
         Raises:
             None
         """
-        if(acquireLock):
+        if acquireLock:
+            self.lock.acquire()
             try:
-                self.lock.acquire()
                 self.dev.write(command)
             finally:
                 self.lock.release()
@@ -173,12 +169,13 @@ class BaseInstrument():
         response = self.dev.read().strip()
         return response
 
-    def _query(self, command):
+    def _query(self, command, acquireLock: bool = True) -> str:
         """
         Sends command and returns response
 
         Args:
             command (str): Command to send
+            acquireLock (bool): Where we need to lock the serial object
 
         Returns:
             str: Response from Instrument
@@ -186,12 +183,16 @@ class BaseInstrument():
         Raises:
             None
         """
-        try:
+        if acquireLock:
             self.lock.acquire()
+            try:
+                self._write(command, acquireLock=False)
+                return self._read()
+            finally:
+                self.lock.release()
+        else:
             self._write(command, acquireLock=False)
             return self._read()
-        finally:
-            self.lock.release()
 
     def _query_raw(self, command):
         """
@@ -228,14 +229,14 @@ class BaseInstrument():
         """
         errorList = []
         errors = self._query(":SYST:ERR?")
-        if(errors != '+0,"No error"'):
+        if errors != '+0,"No error"':
             errorStrings = errors.split('",')
 
             for x in errorStrings:
                 errorCode, errorMessage = x.split(',"')
                 # Last item in list isn't comma terminated so need
                 # to manually remove trailing speech marks
-                errorMessage.rstrip("\"")
+                errorMessage.rstrip('"')
                 errorList.append((int(errorCode), errorMessage))
         return errorList
 
@@ -257,7 +258,7 @@ class BaseInstrument():
         while not event.is_set() and self.error is False:
             sleep(3)
             errorList = self.read_instrument_errors()
-            if(errorList != []):
+            if errorList != []:
                 self.error = True
                 for code, message in errorList:
                     logging.error(
@@ -265,9 +266,7 @@ class BaseInstrument():
                         f"Shutting down..."
                     )
                 self.supervisor.handle_instrument_error()
-        logging.debug(
-            f"{self.name} monitoring thread shutdown"
-        )
+        logging.debug(f"{self.name} monitoring thread shutdown")
 
     def cleanup(self):
         """

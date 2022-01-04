@@ -1,19 +1,22 @@
-from dataclasses import dataclass, field
+import argparse
 import enum
-
 import logging
+import math
+import pickle
+from dataclasses import dataclass, field
+from typing import List, Union
 
 import xlsxwriter
-from AutomatedTesting.SignalGenerator.SignalGenerator import SignalGenerator, SignalGeneratorChannel
+
+from AutomatedTesting.SignalGenerator.SignalGenerator import (
+    SignalGenerator, SignalGeneratorChannel)
 from AutomatedTesting.SpectrumAnalyser.SpectrumAnalyser import SpectrumAnalyser
 from AutomatedTesting.TestDefinitions.TestSupervisor import TestSupervisor
-from AutomatedTesting.TopLevel.config import sdg2122x, e4407b
-import argparse
-from typing import List, Union
-from AutomatedTesting.TopLevel.UsefulFunctions import StraightLine, best_fit_line_with_known_gradient, intercept_point, readable_freq
+from AutomatedTesting.TopLevel.config import e4407b, sdg2122x
 from AutomatedTesting.TopLevel.ExcelHandler import ExcelWorksheetWrapper
-import pickle
-import math
+from AutomatedTesting.TopLevel.UsefulFunctions import (
+    StraightLine, best_fit_line_with_known_gradient, intercept_point,
+    readable_freq)
 
 
 @dataclass
@@ -25,7 +28,7 @@ class IMDMeasurementPoint:
     # Key is the IMDn product with 0.1 added to indicate the upper tone
     # i.e. the value at index '3' corresponds to IMD3 (lower tone)
     # the value at index 5.1 corresponds to IMD5 (upper tone)
-    imdPoints: 'dict[float, float]' = field(default_factory=dict)
+    imdPoints: "dict[float, float]" = field(default_factory=dict)
 
 
 @dataclass
@@ -41,7 +44,7 @@ class SingleFreqSingleIMDPoint:
 
 @dataclass
 class SingleFreqResults:
-    ipn: 'dict[int, SingleFreqSingleIMDPoint]'
+    ipn: "dict[int, SingleFreqSingleIMDPoint]"
 
 
 def main(
@@ -53,7 +56,7 @@ def main(
     lowerPowerLimit: float,
     upperPowerLimit: float,
     refLevel: float,
-    intermodTerms: 'Union[list[int], None]' = None,
+    intermodTerms: "Union[list[int], None]" = None,
     # Offset of signal generator relative to spectrum analyser
     # e.g. for 2m transverter at 144MHz with a input of 28MHz
     # this should be set to -116e6
@@ -61,26 +64,27 @@ def main(
     resolutionBandWidth: int = None,
     useZeroSpan: bool = False,
     pickleFile: str = None,
-    excelWorkbook: 'Union[xlsxwriter.workbook.Workbook, None]' = None
+    excelWorkbook: "Union[xlsxwriter.workbook.Workbook, None]" = None,
 ):
 
     channel1: SignalGeneratorChannel
     channel2: SignalGeneratorChannel
     datapoints: List[IMDMeasurementPoint]
-    imdSweeps: 'dict[float, List[IMDMeasurementPoint]]'
-    results: 'dict[float, SingleFreqResults]'
+    imdSweeps: "dict[float, List[IMDMeasurementPoint]]"
+    results: "dict[float, SingleFreqResults]"
     worksheet: ExcelWorksheetWrapper
 
     if not pickleFile:
         imdSweeps = {}
-        assert len(signalGeneratorChannels) == 2, \
-            "Exactly 2 channel numbers must be specified"
+        assert (
+            len(signalGeneratorChannels) == 2
+        ), "Exactly 2 channel numbers must be specified"
 
         with TestSupervisor(
             loggingLevel=logging.DEBUG,
             instruments=[spectrumAnalyser, signalGenerator],
             calibrationPower=0,
-            saveResults=False
+            saveResults=False,
         ) as _:
             channel1 = signalGenerator.reserve_channel(
                 signalGeneratorChannels[0], "Lower IMD Tone"
@@ -102,27 +106,22 @@ def main(
                     )
             else:
                 spectrumAnalyser.set_rbw(
-                    resolutionBandWidth if resolutionBandWidth is not None
-                    else 1000
+                    resolutionBandWidth if resolutionBandWidth is not None else 1000
                 )
 
             # Sanity check measurement
-            assert intermodTerms is not None, \
-                "No Measurement Requested"
+            assert intermodTerms is not None, "No Measurement Requested"
 
             for x in intermodTerms:
                 # All intermod terms must be odd
-                assert (x > 1) and (x % 2 == 1), \
-                    "Can only handle odd intermod terms"
+                assert (x > 1) and (x % 2 == 1), "Can only handle odd intermod terms"
 
             if useZeroSpan:
                 spectrumAnalyser.set_span(0)
                 spectrumAnalyser.set_sweep_time(10)
                 measure_power = spectrumAnalyser.measure_power_zero_span
             else:
-                spectrumAnalyser.set_span(
-                    toneSpacing * (max(intermodTerms) + 1)
-                )
+                spectrumAnalyser.set_span(toneSpacing * (max(intermodTerms) + 1))
                 measure_power = spectrumAnalyser.measure_power_marker
 
             for freq in freqList:
@@ -149,7 +148,7 @@ def main(
                 channel2.enable_output()
 
                 power = lowerPowerLimit
-                while(power <= upperPowerLimit):
+                while power <= upperPowerLimit:
                     channel1.set_power(power + 3.3)
                     channel2.set_power(power + 3.3)
                     spectrumAnalyser.trigger_measurement()
@@ -157,24 +156,22 @@ def main(
                     newDatapoint = IMDMeasurementPoint(
                         toneSetpoint=power,
                         upperTone=measure_power(f2),
-                        lowerTone=measure_power(f1)
+                        lowerTone=measure_power(f1),
                     )
 
                     # Iterate over all the requested intermod measurements
                     for x in intermodTerms:
-                        newDatapoint.imdPoints[(x + 0.1)] = \
-                            measure_power(
-                                0.5 * (x + 1) * f2 - 0.5 * (x - 1) * f1
-                            )
-                        newDatapoint.imdPoints[(x)] = \
-                            measure_power(
-                                0.5 * (x + 1) * f1 - 0.5 * (x - 1) * f2
-                            )
+                        newDatapoint.imdPoints[(x + 0.1)] = measure_power(
+                            0.5 * (x + 1) * f2 - 0.5 * (x - 1) * f1
+                        )
+                        newDatapoint.imdPoints[(x)] = measure_power(
+                            0.5 * (x + 1) * f1 - 0.5 * (x - 1) * f2
+                        )
 
                     datapoints.append(newDatapoint)
 
                     # Go in 2dB steps if negligible IMD else go in 1dB steps
-                    if measure_power(2*f2 - f1) > noiseFloor + 3:
+                    if measure_power(2 * f2 - f1) > noiseFloor + 3:
                         power += 1
                     else:
                         power += 2
@@ -183,11 +180,11 @@ def main(
                 imdSweeps[freq] = datapoints
 
             # Save results
-            with open("imdTest.P", 'wb') as pickleFile:
+            with open("imdTest.P", "wb") as pickleFile:
                 pickle.dump(imdSweeps, pickleFile)
     else:
         # Load results from file
-        with open(pickleFile, 'rb') as savedData:
+        with open(pickleFile, "rb") as savedData:
             imdSweeps = pickle.load(savedData)
 
     # We've got results, now process them
@@ -249,9 +246,7 @@ def main(
         worksheet.currentRow = worksheet.headersRow
 
         toneBestFit = best_fit_line_with_known_gradient(
-            [x.toneSetpoint for x in datapoints],
-            [x.upperTone for x in datapoints],
-            1
+            [x.toneSetpoint for x in datapoints], [x.upperTone for x in datapoints], 1
         )
 
         if toneBestFit:
@@ -259,9 +254,7 @@ def main(
             toneBestFitColumn = worksheet.currentColumn
             worksheet.write_and_move_down("Tone - Upper (Best Fit)")
             for x in datapoints:
-                worksheet.write_and_move_down(
-                    toneBestFit.evaluate(x.toneSetpoint)
-                )
+                worksheet.write_and_move_down(toneBestFit.evaluate(x.toneSetpoint))
             worksheet.new_column()
             worksheet.currentRow = worksheet.headersRow
 
@@ -297,7 +290,7 @@ def main(
             measuredIPn.upperBestFit = best_fit_line_with_known_gradient(
                 [x.toneSetpoint for x in datapoints],
                 [x.imdPoints[imdTone + 0.1] for x in datapoints],
-                expectedGradient=imdTone
+                expectedGradient=imdTone,
             )
 
             if measuredIPn.upperBestFit:
@@ -321,13 +314,14 @@ def main(
             measuredIPn.lowerBestFit = best_fit_line_with_known_gradient(
                 [x.toneSetpoint for x in datapoints],
                 [x.imdPoints[imdTone] for x in datapoints],
-                expectedGradient=imdTone
+                expectedGradient=imdTone,
             )
 
             print([x.toneSetpoint for x in datapoints])
             print([x.imdPoints[imdTone] for x in datapoints])
-            print(imdTone)
-            print(measuredIPn.lowerBestFit)
+            print(f"{imdTone=}")
+            print(f"{measuredIPn.upperBestFit=}")
+            print(f"{measuredIPn.lowerBestFit=}")
 
             if measuredIPn.lowerBestFit:
                 worksheet.hide_current_column()
@@ -343,12 +337,8 @@ def main(
             # point
             if measuredIPn.upperBestFit and measuredIPn.lowerBestFit:
                 # we got best fit lines for both
-                _, upperIPn = intercept_point(
-                    toneBestFit, measuredIPn.upperBestFit
-                )
-                _, lowerIPn = intercept_point(
-                    toneBestFit, measuredIPn.lowerBestFit
-                )
+                _, upperIPn = intercept_point(toneBestFit, measuredIPn.upperBestFit)
+                _, lowerIPn = intercept_point(toneBestFit, measuredIPn.lowerBestFit)
                 # Work out which has worse IPn as that is what we'll quote
                 # as the result
                 if lowerIPn < upperIPn:
@@ -363,26 +353,20 @@ def main(
             # Calculate Intercept points
             if measuredIPn.finalBestFit:
                 measuredIPn.iipn, measuredIPn.oipn = intercept_point(
-                    measuredIPn.finalBestFit,
-                    toneBestFit
+                    measuredIPn.finalBestFit, toneBestFit
                 )
 
-
-
         workbook.close()  # @DEBUG
-        return        
-
-
+        return
 
         # IMD3
         if measuredIMD3:
             worksheet.write_and_move_right("IMD3 - Upper")
-            upperIMD3BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.upperIMD3 for x in datapoints],
-                    3
-                )
+            upperIMD3BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.upperIMD3 for x in datapoints],
+                3,
+            )
             if upperIMD3BestFit:
                 worksheet.hide_current_column()
                 IMD3BestFitColumn = worksheet.currentColumn
@@ -390,12 +374,11 @@ def main(
                 worksheet.write_and_move_right("IMD3 - Upper (Best Fit)")
 
             worksheet.write_and_move_right("IMD3 - Lower")
-            lowerIMD3BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.lowerIMD3 for x in datapoints],
-                    3
-                )
+            lowerIMD3BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.lowerIMD3 for x in datapoints],
+                3,
+            )
             if lowerIMD3BestFit:
                 worksheet.hide_current_column()
                 if IMD3BestFitColumn:
@@ -415,12 +398,11 @@ def main(
         # IMD5
         if measuredIMD5:
             worksheet.write_and_move_right("IMD5 - Upper")
-            upperIMD5BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.upperIMD5 for x in datapoints],
-                    5
-                )
+            upperIMD5BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.upperIMD5 for x in datapoints],
+                5,
+            )
             if upperIMD5BestFit:
                 worksheet.hide_current_column()
                 IMD5BestFitColumn = worksheet.currentColumn
@@ -428,12 +410,11 @@ def main(
                 worksheet.write_and_move_right("IMD5 - Upper (Best Fit)")
 
             worksheet.write_and_move_right("IMD5 - Lower")
-            lowerIMD5BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.lowerIMD5 for x in datapoints],
-                    5
-                )
+            lowerIMD5BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.lowerIMD5 for x in datapoints],
+                5,
+            )
             if lowerIMD5BestFit:
                 worksheet.hide_current_column()
                 if upperIMD5BestFit:
@@ -453,12 +434,11 @@ def main(
         # IMD7
         if measuredIMD7:
             worksheet.write_and_move_right("IMD7 - Upper")
-            upperIMD7BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.upperIMD7 for x in datapoints],
-                    7
-                )
+            upperIMD7BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.upperIMD7 for x in datapoints],
+                7,
+            )
             if upperIMD7BestFit:
                 worksheet.hide_current_column()
                 IMD7BestFitColumn = worksheet.currentColumn
@@ -466,12 +446,11 @@ def main(
                 worksheet.write_and_move_right("IMD7 - Upper (Best Fit)")
 
             worksheet.write_and_move_right("IMD7 - Lower")
-            lowerIMD7BestFit = \
-                best_fit_line_with_known_gradient(
-                    [x.toneSetpoint for x in datapoints],
-                    [x.lowerIMD7 for x in datapoints],
-                    7
-                )
+            lowerIMD7BestFit = best_fit_line_with_known_gradient(
+                [x.toneSetpoint for x in datapoints],
+                [x.lowerIMD7 for x in datapoints],
+                7,
+            )
             if lowerIMD7BestFit:
                 worksheet.hide_current_column()
                 if upperIMD7BestFit:
@@ -490,7 +469,7 @@ def main(
 
         # Sort datapoints by increasing setpoint (just in case they're not
         # already sorted)
-        
+
         worksheet.new_row()
         worksheet.currentColumn += 1
 
@@ -556,100 +535,119 @@ def main(
         if measuredIMD3:
             worksheet.currentColumn += 1  # Skip Upper IMD3
             if upperIMD3BestFit:
-                worksheet.write_and_move_right(upperIMD3BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    upperIMD3BestFit.evaluate(finalDatapoint)
+                )
             worksheet.currentColumn += 1  # Skip Lower IMD3
             if lowerIMD3BestFit:
-                worksheet.write_and_move_right(lowerIMD3BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    lowerIMD3BestFit.evaluate(finalDatapoint)
+                )
 
         if measuredIMD5:
             worksheet.currentColumn += 1  # Skip Upper IMD5
             if upperIMD5BestFit:
-                worksheet.write_and_move_right(upperIMD5BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    upperIMD5BestFit.evaluate(finalDatapoint)
+                )
             worksheet.currentColumn += 1  # Skip Lower IMD5
             if lowerIMD5BestFit:
-                worksheet.write_and_move_right(lowerIMD5BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    lowerIMD5BestFit.evaluate(finalDatapoint)
+                )
 
         if measuredIMD7:
             worksheet.currentColumn += 1  # Skip Upper IMD7
             if upperIMD7BestFit:
-                worksheet.write_and_move_right(upperIMD7BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    upperIMD7BestFit.evaluate(finalDatapoint)
+                )
             worksheet.currentColumn += 1  # Skip Lower IMD7
             if lowerIMD7BestFit:
-                worksheet.write_and_move_right(lowerIMD7BestFit.evaluate(finalDatapoint))
+                worksheet.write_and_move_right(
+                    lowerIMD7BestFit.evaluate(finalDatapoint)
+                )
 
-        centeredFormat = workbook.add_format({'align': 'center'})
+        centeredFormat = workbook.add_format({"align": "center"})
         worksheet.merge_range(
-            worksheet.headersRow - 1, 1,
-            worksheet.headersRow - 1, worksheet.maxColumn,
+            worksheet.headersRow - 1,
+            1,
+            worksheet.headersRow - 1,
+            worksheet.maxColumn,
             "Power per Tone (dBm)",
-            centeredFormat
+            centeredFormat,
         )
 
-        chart = workbook.add_chart({
-            'type': 'scatter',
-            'subtype': 'straight'
-        })
-        chart.set_title({
-            'name': f"IMD - {readable_freq(freq)}"
-        })
-        chart.set_size({'x_scale': 2, 'y_scale': 2})
+        chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
+        chart.set_title({"name": f"IMD - {readable_freq(freq)}"})
+        chart.set_size({"x_scale": 2, "y_scale": 2})
 
         for x in range(2, worksheet.maxColumn + 1):
             if x not in worksheet.hiddenColumns:
-                column = chr(x + ord('A'))
+                column = chr(x + ord("A"))
                 # +1 for data being one row lower, +1 for stupid 0/1 indexing
                 startRow = worksheet.headersRow + 2
-                chart.add_series({
-                    'name':         f"='{worksheet.name}'!${column}${worksheet.headersRow + 1}",
-                    'categories':   f"='{worksheet.name}'!$B${startRow}:"
-                                    f"$B{ startRow + len(datapoints) - 1}",
-                    'values':   f"='{worksheet.name}'!${column}${startRow}:"
-                                    f"${column}{startRow + len(datapoints) - 1}",
-                })
+                chart.add_series(
+                    {
+                        "name": f"='{worksheet.name}'!${column}${worksheet.headersRow + 1}",
+                        "categories": f"='{worksheet.name}'!$B${startRow}:"
+                        f"$B{ startRow + len(datapoints) - 1}",
+                        "values": f"='{worksheet.name}'!${column}${startRow}:"
+                        f"${column}{startRow + len(datapoints) - 1}",
+                    }
+                )
 
         # Add linear interpolation to IPn
         if toneBestFitColumn:
-            column = chr(toneBestFitColumn + ord('A'))
-            chart.add_series({
-                'name': "Tone - Best Fit",
-                'categories':   f"='{worksheet.name}'!$B${startRow}:"
-                                f"$B{startRow + len(datapoints)}",
-                'values':       f"='{worksheet.name}'!${column}${startRow}:"
-                                f"${column}{startRow + len(datapoints)}",
-                'line':         {'dash_type': 'round_dot'}
-            })
+            column = chr(toneBestFitColumn + ord("A"))
+            chart.add_series(
+                {
+                    "name": "Tone - Best Fit",
+                    "categories": f"='{worksheet.name}'!$B${startRow}:"
+                    f"$B{startRow + len(datapoints)}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{startRow + len(datapoints)}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
 
         if IMD3BestFitColumn:
-            column = chr(IMD3BestFitColumn + ord('A'))
-            chart.add_series({
-                'name': "IMD3 - Best Fit",
-                'categories':   f"='{worksheet.name}'!$B${startRow}:"
-                                f"$B{startRow + len(datapoints)}",
-                'values':       f"='{worksheet.name}'!${column}${startRow}:"
-                                f"${column}{startRow + len(datapoints)}",
-                'line':         {'dash_type': 'round_dot'}
-            })
+            column = chr(IMD3BestFitColumn + ord("A"))
+            chart.add_series(
+                {
+                    "name": "IMD3 - Best Fit",
+                    "categories": f"='{worksheet.name}'!$B${startRow}:"
+                    f"$B{startRow + len(datapoints)}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{startRow + len(datapoints)}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
 
         if IMD5BestFitColumn:
-            column = chr(IMD5BestFitColumn + ord('A'))
-            chart.add_series({
-                'name': "IMD5 - Best Fit",
-                'categories':   f"='{worksheet.name}'!$B${startRow}:"
-                                f"$B{startRow + len(datapoints)}",
-                'values':       f"='{worksheet.name}'!${column}${startRow}:"
-                                f"${column}{startRow + len(datapoints)}",
-                'line':         {'dash_type': 'round_dot'}
-            })
+            column = chr(IMD5BestFitColumn + ord("A"))
+            chart.add_series(
+                {
+                    "name": "IMD5 - Best Fit",
+                    "categories": f"='{worksheet.name}'!$B${startRow}:"
+                    f"$B{startRow + len(datapoints)}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{startRow + len(datapoints)}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
         if IMD7BestFitColumn:
-            column = chr(IMD7BestFitColumn + ord('A'))
-            chart.add_series({
-                'name': "IMD7 - Best Fit",
-                'categories':   f"='{worksheet.name}'!$B${startRow}:"
-                                f"$B{startRow + len(datapoints) - 1}",
-                'values':       f"='{worksheet.name}'!${column}${startRow}:"
-                                f"${column}{startRow + len(datapoints)}",
-                'line':         {'dash_type': 'round_dot'}
-            })
+            column = chr(IMD7BestFitColumn + ord("A"))
+            chart.add_series(
+                {
+                    "name": "IMD7 - Best Fit",
+                    "categories": f"='{worksheet.name}'!$B${startRow}:"
+                    f"$B{startRow + len(datapoints) - 1}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{startRow + len(datapoints)}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
 
         chart.show_hidden_data()
 
@@ -663,39 +661,43 @@ def main(
         if IIP3:
             categoryString += f"{IIP3},"
             valueString += f"{OIP3},"
-            ipnLabels.append({'value': f"IIP3 = {round(IIP3, 1)}dBm\nOIP3 = {round(OIP3, 1)}dBm"})
+            ipnLabels.append(
+                {"value": f"IIP3 = {round(IIP3, 1)}dBm\nOIP3 = {round(OIP3, 1)}dBm"}
+            )
         if IIP5:
             categoryString += f"{IIP5},"
             valueString += f"{OIP5},"
-            ipnLabels.append({'value': f"IIP5 = {round(IIP5, 1)}dBm\nOIP5 = {round(OIP5, 1)}dBm"})
+            ipnLabels.append(
+                {"value": f"IIP5 = {round(IIP5, 1)}dBm\nOIP5 = {round(OIP5, 1)}dBm"}
+            )
         if IIP7:
             categoryString += f"{IIP7},"
             valueString += f"{OIP7},"
-            ipnLabels.append({'value': f"IIP7 = {round(IIP7, 1)}dBm\nOIP3 = {round(OIP7, 1)}dBm"})
+            ipnLabels.append(
+                {"value": f"IIP7 = {round(IIP7, 1)}dBm\nOIP3 = {round(OIP7, 1)}dBm"}
+            )
 
         categoryString = categoryString[:-1] + "}"
         valueString = valueString[:-1] + "}"
 
         if "." in categoryString:
             # We actually have some data to plot
-            chart.add_series({
-                'name':         "IPn",
-                'categories':   categoryString,
-                'values':       valueString,
-                'line':         {'none': True},
-                'marker':       {
-                                    'type': 'square',
-                                    'size': 5,
-                                    'fill': {'color': 'red'}
-                                },
-                'data_labels':  {
-                                    'values': True,
-                                    'custom': ipnLabels,
-                                    'position': 'below',
-                                    'border': {'color': 'red'},
-                                    'fill':   {'color': 'yellow'},
-                                }
-            })
+            chart.add_series(
+                {
+                    "name": "IPn",
+                    "categories": categoryString,
+                    "values": valueString,
+                    "line": {"none": True},
+                    "marker": {"type": "square", "size": 5, "fill": {"color": "red"}},
+                    "data_labels": {
+                        "values": True,
+                        "custom": ipnLabels,
+                        "position": "below",
+                        "border": {"color": "red"},
+                        "fill": {"color": "yellow"},
+                    },
+                }
+            )
 
             # Have to manually delete this series from the legend
             # Unfortunately, this wants to be the last series plotted
@@ -703,19 +705,19 @@ def main(
 
             # Following measurements all generate 2 traces
             ipnSeriesNumber = 1
-            ipnSeriesNumber += (measuredIMD3 is True)
-            ipnSeriesNumber += (measuredIMD5 is True)
-            ipnSeriesNumber += (measuredIMD7 is True)
+            ipnSeriesNumber += measuredIMD3 is True
+            ipnSeriesNumber += measuredIMD5 is True
+            ipnSeriesNumber += measuredIMD7 is True
 
             ipnSeriesNumber *= 2
 
             # Following measurements all generate 1 trace
-            ipnSeriesNumber += (upperToneBestFit is not None)
-            ipnSeriesNumber += (IMD3BestFitColumn is not None)
-            ipnSeriesNumber += (IMD5BestFitColumn is not None)
-            ipnSeriesNumber += (IMD7BestFitColumn is not None)
+            ipnSeriesNumber += upperToneBestFit is not None
+            ipnSeriesNumber += IMD3BestFitColumn is not None
+            ipnSeriesNumber += IMD5BestFitColumn is not None
+            ipnSeriesNumber += IMD7BestFitColumn is not None
 
-            chart.set_legend({'delete_series': [ipnSeriesNumber]})
+            chart.set_legend({"delete_series": [ipnSeriesNumber]})
 
         # Work out axis limits
         maxX = datapoints[-1].toneSetpoint
@@ -734,7 +736,7 @@ def main(
         if OIP7:
             maxY = max(maxY, OIP7)
 
-        minY = float('inf')
+        minY = float("inf")
         if datapoints[0].upperIMD3:
             minY = min(minY, datapoints[0].upperIMD3)
         if datapoints[0].upperIMD5:
@@ -742,25 +744,29 @@ def main(
         if datapoints[0].upperIMD7:
             minY = min(minY, datapoints[0].upperIMD7)
 
-        chart.set_x_axis({
-            'name': "Tone Setpoint (dBm)",
-            'min': 5 * math.floor(datapoints[0].toneSetpoint / 5),
-            'max': 5 * math.ceil(1 + maxX / 5),
-            'crossing': -200,
-            'major_unit': 5,
-            'major_gridlines': {'visible': True}
-        })
+        chart.set_x_axis(
+            {
+                "name": "Tone Setpoint (dBm)",
+                "min": 5 * math.floor(datapoints[0].toneSetpoint / 5),
+                "max": 5 * math.ceil(1 + maxX / 5),
+                "crossing": -200,
+                "major_unit": 5,
+                "major_gridlines": {"visible": True},
+            }
+        )
 
-        chart.set_y_axis({
-            'name': 'Power per Tone (dBm)',
-            'crossing': -200,
-            'min': 5 * math.floor(minY / 5 - 1),
-            'max': 5 * math.ceil(1 + maxY / 5),
-            'major_unit': 10,
-            'minor_unit': 5,
-            'major_gridlines': {'visible': True},
-            'minor_gridlines': {'visible': True}
-        })
+        chart.set_y_axis(
+            {
+                "name": "Power per Tone (dBm)",
+                "crossing": -200,
+                "min": 5 * math.floor(minY / 5 - 1),
+                "max": 5 * math.ceil(1 + maxY / 5),
+                "major_unit": 10,
+                "minor_unit": 5,
+                "major_gridlines": {"visible": True},
+                "minor_gridlines": {"visible": True},
+            }
+        )
 
         worksheet.insert_chart(0, 0, chart)
 
@@ -771,18 +777,10 @@ def main(
         workbook.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--freqs",
-        nargs="*",
-        type=int
-    )
-    parser.add_argument(
-        "--toneSpacing",
-        type=int,
-        default=0
-    )
+    parser.add_argument("--freqs", nargs="*", type=int)
+    parser.add_argument("--toneSpacing", type=int, default=0)
 
     args = parser.parse_args()
     assert args.freqs is not None
@@ -798,7 +796,7 @@ if __name__ == '__main__':
             lowerPowerLimit=-40,
             upperPowerLimit=-10,
             refLevel=25,
-            #pickleFile="imdTest.P"
+            pickleFile="imdTest.P",
         )
     except KeyboardInterrupt:
         pass
