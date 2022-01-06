@@ -199,6 +199,9 @@ class Agilent_E4407B(SpectrumAnalyser):
         self._write(f":SWE:POIN {numPoints}")
         logging.debug(f"{self.name} set number of points to {numPoints}")
 
+    def get_sweep_points(self) -> int:
+        return int(self._query(":SWE:POIN?"))
+
     def set_sweep_time(self, sweepTime):
         """
         Sets Sweep time in ms

@@ -1,8 +1,9 @@
+import logging
+from copy import copy
 from dataclasses import dataclass
 from typing import List, Tuple
-from copy import copy
+
 import numpy
-import logging
 
 
 def readable_freq(freq):
@@ -64,7 +65,7 @@ def best_fit_line_with_known_gradient(
     xValues: List[float],
     yValues: List[float],
     expectedGradient: float = 3,
-    maxErrorPercentage: float = 1.5
+    maxErrorPercentage: float = 2
 ) -> StraightLine:
     """
     Takes a list of y and x values, attempts to find line by removing data

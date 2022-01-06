@@ -1,7 +1,8 @@
-from dataclasses import dataclass
-import xlsxwriter
 import logging
+from dataclasses import dataclass
 from typing import List
+
+import xlsxwriter
 
 
 class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
@@ -20,6 +21,8 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
         self.hiddenColumns = []
         self.name = name
         self.headersRow = 0
+        self.headersColumn = "A"
+        self.chart = None
 
     def hide_current_column(self) -> None:
         columnLetter = chr(self.currentColumn + ord('A'))
@@ -58,3 +61,18 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
 
     def save_headers_row(self):
         self.headersRow = self.currentRow
+
+    def plot_current_column(self):
+          # Plot upper tone
+        column = chr(self.currentColumn + ord("A"))
+        # +1 for data being one row lower, +1 for stupid 0/1 indexing
+        startRow = self.headersRow + 2
+        self.chart.add_series(
+            {
+                "name": f"='{self.name}'!${column}${self.headersRow + 1}",
+                "categories": f"='{self.name}'!${self.headersColumn}${startRow}:"
+                f"${self.headersColumn}{self.maxRow + 1}",
+                "values": f"='{self.name}'!${column}${startRow}:"
+                f"${column}{self.maxRow + 1}",
+            }
+        )
