@@ -1,5 +1,4 @@
 import argparse
-import enum
 import logging
 import math
 import pickle
@@ -102,7 +101,7 @@ def main(
                     )
             else:
                 spectrumAnalyser.set_rbw(
-                    resolutionBandWidth if resolutionBandWidth is not None else 1000
+                    resolutionBandWidth if resolutionBandWidth else 1000
                 )
 
             # Sanity check measurement
@@ -119,8 +118,9 @@ def main(
             else:
                 maxIntermod = max(intermodTerms)
                 spectrumAnalyser.set_span(toneSpacing * (maxIntermod + 1))
-                # It's really important that each tone aligns perfectly with a measurement points
-                # Really suggest locking the oscillators of the spectrum analyser and signal generator
+                # It's really important that each tone aligns perfectly with
+                # a measurement points. Really suggest locking the oscillators
+                # of the spectrum analyser and signal generator
                 requiredSweepPoints = 100 * (maxIntermod + 1) + 1
                 spectrumAnalyser.set_sweep_points(requiredSweepPoints)
                 assert spectrumAnalyser.get_sweep_points() == requiredSweepPoints
@@ -208,7 +208,8 @@ def main(
     chart.set_size({"x_scale": 2, "y_scale": 2})
     overallWorksheet.insert_chart(0, 0, chart)
 
-    # Have to rediscover details about the sweep as we may have loaded the results
+    # Have to rediscover details about the sweep as we may have
+    # loaded the results
     sweptFrequencies = list(imdSweeps.keys())
     sweptFrequencies.sort()
     for freq in sweptFrequencies:
@@ -254,8 +255,8 @@ def main(
 
         worksheet.insert_chart(0, 0, chart)
 
-        # Attempt to linearise all of the curves and add headings for measurements
-        # and best fit lines (if we could find one)
+        # Attempt to linearise all of the curves and add headings for
+        # measurements and best fit lines (if we could find one)
 
         # Ensure datapoints are sorted in increasing tone power
         datapoints.sort(key=lambda x: x.toneSetpoint)
@@ -384,7 +385,8 @@ def main(
             chart.add_series(
                 {
                     "name": f"{toneName} - Best Fit",
-                    "categories": f"='{worksheet.name}'!${worksheet.headersColumn}${startRow}:"
+                    "categories": f"='{worksheet.name}'"
+                    f"!${worksheet.headersColumn}${startRow}:"
                     f"${worksheet.headersColumn}{worksheet.maxRow + 1}",
                     "values": f"='{worksheet.name}'!${column}${startRow}:"
                     f"${column}{worksheet.maxRow + 1}",
@@ -401,7 +403,8 @@ def main(
         valueString = "={"
         maxX = upperPowerLimit
         minX = lowerPowerLimit
-        # minY = Highest order IMD (as assume it'll be the lowest signal level) of first data point
+        # minY = Highest order IMD (as assume it'll be the lowest signal
+        # level) of first data point
         minY = datapoints[0].imdPoints[max(measuredIMDTerms)]
         # maxY = 1st tone (fundamental) of final data point
         maxY = datapoints[-1].imdPoints[1]
@@ -414,7 +417,8 @@ def main(
                 valueString += f"{x.oipn},"
                 ipnLabels.append(
                     {
-                        "value": f"IIP{imdTone} = {round(x.iipn, 1)}dBm\nOIP3 = {round(x.oipn, 1)}dBm"
+                        "value": f"IIP{imdTone} = {round(x.iipn, 1)}dBm\n"
+                        f"OIP3 = {round(x.oipn, 1)}dBm"
                     }
                 )
                 maxX = max(maxX, x.iipn)
@@ -472,7 +476,6 @@ def main(
             }
         )
 
-
     # We now have all the data plotted so add a final sheet
     # with the overall results
     overallWorksheet.new_column()
@@ -482,7 +485,7 @@ def main(
     overallWorksheet.new_column()
     worksheet = overallWorksheet
     chart = worksheet.chart
-    chart.show_blanks_as('span')
+    chart.show_blanks_as("span")
     chart.set_x_axis(
         {
             "name": "Frequency (MHz)",
@@ -510,7 +513,7 @@ def main(
             except KeyError:
                 worksheet.write_and_move_down("")
         if gotResults:
-            column = chr(worksheet.currentColumn + ord('A'))
+            column = chr(worksheet.currentColumn + ord("A"))
             startRow = worksheet.headersRow + 2
             chart.add_series(
                 {
@@ -523,7 +526,6 @@ def main(
                 }
             )
 
-
         worksheet.new_column()
         worksheet.write_and_move_down(f"OIP{imd} (dBm)")
         gotResults = False
@@ -535,7 +537,7 @@ def main(
             except KeyError:
                 worksheet.write_and_move_down("")
         if gotResults:
-            column = chr(worksheet.currentColumn + ord('A'))
+            column = chr(worksheet.currentColumn + ord("A"))
             startRow = worksheet.headersRow + 2
             chart.add_series(
                 {
@@ -548,7 +550,6 @@ def main(
                 }
             )
         worksheet.new_column()
-
 
     if not excelWorkbook:
         workbook.close()
