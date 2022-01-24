@@ -9,3 +9,4 @@ linux-gpib/*
 *.P
 *.p
 *.xlsx
+**/*.egg-info
