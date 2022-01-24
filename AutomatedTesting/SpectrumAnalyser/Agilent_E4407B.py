@@ -299,7 +299,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             index += 4
         return traceData
 
-    """def read_instrument_errors(self):
+    def read_instrument_errors(self):
         """
         Checks whole instrument for errors
 
@@ -312,4 +312,4 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        return []"""
+        return []
