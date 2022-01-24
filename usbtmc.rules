@@ -1,0 +1,17 @@
+# USBTMC instruments
+
+# Agilent MSO7104
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="0aad", ATTRS{idProduct}=="0054", GROUP="usbtmc", MODE="0660"
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="0957", ATTRS{idProduct}=="2b18", GROUP="usbtmc", MODE="0660"
+
+#NI GPIB_USB_B
+
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="3923", ATTRS{idProduct}=="702[ab]", GROUP="usbtmc", MODE="0660"
+
+# Siglent SDG2122X
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="f4ec", ATTRS{idProduct}=="1102", GROUP="usbtmc", MODE="0660"
+
+# Agilent E4407B
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2065", GROUP="usbtmc", MODE="0660"
+
+
