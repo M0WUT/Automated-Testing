@@ -8,8 +8,8 @@ Folder Structure:
 * scratchpad.py: Test file used for developing tests - contents in this file should not be treated as anything important. Once a test is working, it will be moved to the ProperTests folder
 
 # Required Install
-*Install dependency of numpy
+* Install dependency of numpy
 `sudo apt install libatlas-base-dev`
 
-* Install module as editable
-`pip3 install -e AutomatedTesting/`
+* Install module as editable (must be run from this folder)
+`pip3 install -e .`
