@@ -1,8 +1,9 @@
 import logging
 from time import sleep
 
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
-    SpectrumAnalyser
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
 
 
@@ -13,7 +14,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         name="Agilent E4407B",
         enableDisplay=False,
         enableAutoAlign=True,
-        enableLowPhaseNoise=False,
+        enableLowPhaseNoise=True,
     ):
         super().__init__(
             address,
@@ -21,7 +22,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             name=name,
             minFreq=9e3,
             maxFreq=26.5e9,
-            timeout=20000,
+            timeout=40000,
         )
         self.enableDisplay = enableDisplay
         self.enableAutoAlign = enableAutoAlign
@@ -49,6 +50,8 @@ class Agilent_E4407B(SpectrumAnalyser):
 
         if not self.enableLowPhaseNoise:
             self._write(":FREQ:SYNT 3")
+
+        self.set_input_attenuator(10)
 
         self._write(":INIT:CONT ON")
         super().cleanup()
@@ -276,6 +279,22 @@ class Agilent_E4407B(SpectrumAnalyser):
             None
         """
         self._write(f":DISP:WIND:TRAC:Y:RLEV {refLevel}")
+
+    def set_input_attenuator(self, attenuation: int) -> None:
+        self._write(f"POW:ATT {attenuation}")
+
+    def set_ampl_scale(self, dbPerDiv: float) -> None:
+        """
+        Sets y-axis scale in dB/div
+
+        Args:
+            dbPerDiv: Requested number of dB per division
+
+        Returns:
+            None
+        """
+        assert 0.1 <= dbPerDiv <= 20
+        self._write(f"DISP:WIND:TRAC:Y:PDIV {round(dbPerDiv, 1)}")
 
     """
     def get_trace_data(self):

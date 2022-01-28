@@ -24,7 +24,6 @@ def run_noise_figure_test(
     # Ensure PSU output is off
     psu.disable_output()
     psu.set_current(2 * noiseSource.onCurrent)
-    psu.enable_ocp()
     psu.set_voltage(noiseSource.onVoltage)
 
     # Setup spectrum analyser
@@ -34,6 +33,9 @@ def run_noise_figure_test(
     spectrumAnalyser.set_rms_detector_mode()
     spectrumAnalyser.set_rbw(30e3)
     spectrumAnalyser.set_ref_level(-60)
+    spectrumAnalyser.set_ampl_scale(5)
+    spectrumAnalyser.set_input_attenuator(0)
+    spectrumAnalyser.set_sweep_time(10000)
 
     freqs = linspace(minFreq, maxFreq, numFreqPoints)
 
@@ -45,8 +47,10 @@ def run_noise_figure_test(
     # Measure noise of spectrum analyser
     saOffList = spectrumAnalyser.get_trace_data()
     psu.enable_output()
+    time.sleep(2)
     saOnList = spectrumAnalyser.get_trace_data()
     psu.disable_output()
+    time.sleep(2)
 
     # Measure with DUT
     input(
@@ -56,35 +60,19 @@ def run_noise_figure_test(
     # Measure combined noise of spectrum analyser + DUT
     combinedOffList = spectrumAnalyser.get_trace_data()
     psu.enable_output()
+    time.sleep(2)
     combinedOnList = spectrumAnalyser.get_trace_data()
     psu.disable_output()
+    time.sleep(2)
 
-    results = []
+    noiseFigures = []
+    gains = []
 
     for (freq, saOff, saOn, combinedOff, combinedOn) in zip(
         freqs, saOffList, saOnList, combinedOffList, combinedOnList
     ):
         enr = noiseSource.evaluate_enr(freq)
         sourceNoiseTemp = t0 * (1 + pow(10, enr / 10))
-
-        # Calculate Spectrum Analyser noise figure
-        saYFactor = pow(10, (saOn - saOff) / 10)
-        saNoiseTemperature = (sourceNoiseTemp - saYFactor * t0) / (saYFactor - 1)
-        saNoiseFigure = enr - 10 * log10(saYFactor - 1)
-        print(f"{freq}, {saNoiseFigure}")
-
-        # Check SA noise figure is good enough for valid measurement
-        if enr < (saNoiseFigure + 3):
-            logging.warning(
-                f"Measurement at {readable_freq(freq)} may be invalid due to "
-                f"insufficiently low NF of {spectrumAnalyser.name}"
-            )
-
-        # Calculate DUT + SA noise temperature
-        combinedYFactor = pow(10, (combinedOn - combinedOff) / 10)
-        combinedNoiseTemp = (sourceNoiseTemp - combinedYFactor * t0) / (
-            combinedYFactor - 1
-        )
 
         # Calculate DUT Gain
         saOffWatts = pow(10, saOff / 10)
@@ -95,11 +83,30 @@ def run_noise_figure_test(
         dutGainLinear = (dutOnWatts - dutOffWatts) / (saOnWatts - saOffWatts)
         dutGainDb = 10 * log10(dutGainLinear)
 
+        # Calculate Spectrum Analyser noise figure
+        saYFactor = saOnWatts / saOffWatts
+        saNoiseTemperature = (sourceNoiseTemp - saYFactor * t0) / (saYFactor - 1)
+        saNoiseFigure = enr - 10 * log10(saYFactor - 1)
+
+        # Calculate DUT + SA noise temperature
+        combinedYFactor = dutOnWatts / dutOffWatts
+        combinedNoiseTemp = (sourceNoiseTemp - combinedYFactor * t0) / (
+            combinedYFactor - 1
+        )
+        combinedNoiseFigure = 10 * log10(1 + combinedNoiseTemp / t0)
+
         # Calculate DUT Noise Figure
         dutNoiseTemp = combinedNoiseTemp - saNoiseTemperature / dutGainLinear
         dutNoiseFigure = 10 * log10(1 + dutNoiseTemp / t0)
 
-        # Check ENR noise figure is high enough for valid measurement
+        # Check SA noise figure is good enough for valid measurement
+        if enr < (saNoiseFigure + 3):
+            logging.warning(
+                f"Measurement at {readable_freq(freq)} may be invalid due to "
+                f"insufficiently low NF of {spectrumAnalyser.name}"
+            )
+
+        # Check ENR is high enough for valid measurement
         if enr < (dutNoiseFigure + 5):
             logging.warning(
                 f"Measurement at {readable_freq(freq)} may be invalid due to "
@@ -113,5 +120,6 @@ def run_noise_figure_test(
                 f"excess noise figure being too close to calibration"
             )
 
-        results.append((freq, dutNoiseFigure))
-    # print(results)
+        gains.append(dutGainDb)
+        noiseFigures.append(dutNoiseFigure)
+    return (freqs, noiseFigures, gains)
