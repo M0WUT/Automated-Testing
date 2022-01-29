@@ -16,5 +16,6 @@ setup(
         "pyvisa-py",
         "numpy",
         "pyusb",
+        "GitPython",
     ],
 )

@@ -7,20 +7,15 @@ from typing import List, Optional, Union
 
 import xlsxwriter
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
-    SignalGenerator,
-    SignalGeneratorChannel,
-)
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    SpectrumAnalyser,
-)
+    SignalGenerator, SignalGeneratorChannel)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
+    SpectrumAnalyser
 from AutomatedTesting.Instruments.TopLevel.config import e4407b, sdg2122x
-from AutomatedTesting.Instruments.TopLevel.ExcelHandler import ExcelWorksheetWrapper
+from AutomatedTesting.Instruments.TopLevel.ExcelHandler import \
+    ExcelWorksheetWrapper
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import (
-    StraightLine,
-    best_fit_line_with_known_gradient,
-    intercept_point,
-    readable_freq,
-)
+    StraightLine, best_fit_line_with_known_gradient, intercept_point,
+    readable_freq)
 from AutomatedTesting.PytestDefinitions.TestSupervisor import TestSupervisor
 
 
@@ -76,112 +71,102 @@ def run_imd_test(
     if not pickleFile:
         imdSweeps = {}
 
-        with TestSupervisor(
-            loggingLevel=logging.DEBUG,
-            instruments=[spectrumAnalyser, signalGenerator],
-        ) as _:
-            channel1 = signalGenerator.reserve_channel(
-                signalGeneratorChannels[0], "Lower IMD Tone"
-            )
-            channel2 = signalGenerator.reserve_channel(
-                signalGeneratorChannels[1], "Upper IMD Tone"
-            )
-            channel1.set_power(lowerPowerLimit)
-            channel2.set_power(lowerPowerLimit)
+        channel1.set_power(lowerPowerLimit)
+        channel2.set_power(lowerPowerLimit)
 
-            # Setup Spectrum analyser
-            spectrumAnalyser.set_ref_level(refLevel)
-            if resolutionBandWidth:
-                if resolutionBandWidth > toneSpacing / 200:
-                    logging.warning(
-                        f"Requested RBW of {resolutionBandWidth} is too large"
-                        "(> Tone Spacing / 200) and may lead to inaccurate"
-                        " results"
-                    )
-            else:
-                spectrumAnalyser.set_rbw(
-                    resolutionBandWidth if resolutionBandWidth else 1000
+        # Setup Spectrum analyser
+        spectrumAnalyser.set_ref_level(refLevel)
+        if resolutionBandWidth:
+            if resolutionBandWidth > toneSpacing / 200:
+                logging.warning(
+                    f"Requested RBW of {resolutionBandWidth} is too large"
+                    "(> Tone Spacing / 200) and may lead to inaccurate"
+                    " results"
                 )
+        else:
+            spectrumAnalyser.set_rbw(
+                resolutionBandWidth if resolutionBandWidth else 1000
+            )
 
-            # Sanity check measurement
-            assert intermodTerms is not None, "No Measurement Requested"
+        # Sanity check measurement
+        assert intermodTerms is not None, "No Measurement Requested"
 
-            for x in intermodTerms:
-                # All intermod terms must be odd
-                assert (x > 1) and (x % 2 == 1), "Can only handle odd intermod terms"
+        for x in intermodTerms:
+            # All intermod terms must be odd
+            assert (x > 1) and (x % 2 == 1), "Can only handle odd intermod terms"
 
-            if useZeroSpan:
-                spectrumAnalyser.set_span(0)
-                spectrumAnalyser.set_sweep_time(10)
-                measure_power = spectrumAnalyser.measure_power_zero_span
-            else:
-                maxIntermod = max(intermodTerms)
-                spectrumAnalyser.set_span(toneSpacing * (maxIntermod + 1))
-                # It's really important that each tone aligns perfectly with
-                # a measurement points. Really suggest locking the oscillators
-                # of the spectrum analyser and signal generator
-                requiredSweepPoints = 100 * (maxIntermod + 1) + 1
-                spectrumAnalyser.set_sweep_points(requiredSweepPoints)
-                assert spectrumAnalyser.get_sweep_points() == requiredSweepPoints
-                measure_power = spectrumAnalyser.measure_power_marker
+        if useZeroSpan:
+            spectrumAnalyser.set_span(0)
+            spectrumAnalyser.set_sweep_time(10)
+            measure_power = spectrumAnalyser.measure_power_zero_span
+        else:
+            maxIntermod = max(intermodTerms)
+            spectrumAnalyser.set_span(toneSpacing * (maxIntermod + 1))
+            # It's really important that each tone aligns perfectly with
+            # a measurement points. Really suggest locking the oscillators
+            # of the spectrum analyser and signal generator
+            requiredSweepPoints = 100 * (maxIntermod + 1) + 1
+            spectrumAnalyser.set_sweep_points(requiredSweepPoints)
+            assert spectrumAnalyser.get_sweep_points() == requiredSweepPoints
+            measure_power = spectrumAnalyser.measure_power_marker
 
-            for freq in freqList:
-                datapoints = []
-                channel1.disable_output()
-                channel2.disable_output()
+        for freq in freqList:
+            datapoints = []
+            channel1.disable_output()
+            channel2.disable_output()
 
-                f1 = freq - 0.5 * toneSpacing
-                f2 = freq + 0.5 * toneSpacing
-                channel1.set_power(lowerPowerLimit)
-                channel1.set_freq(f1 + freqOffset)
-                channel2.set_power(lowerPowerLimit)
-                channel2.set_freq(f2 + freqOffset)
+            f1 = freq - 0.5 * toneSpacing
+            f2 = freq + 0.5 * toneSpacing
+            channel1.set_power(lowerPowerLimit)
+            channel1.set_freq(f1 + freqOffset)
+            channel2.set_power(lowerPowerLimit)
+            channel2.set_freq(f2 + freqOffset)
 
-                spectrumAnalyser.set_centre_freq(freq)
+            spectrumAnalyser.set_centre_freq(freq)
 
-                # Get Noise Floor with no tones
-                # This allows for faster sweeping by ignoring points
-                # with negligible IMD
+            # Get Noise Floor with no tones
+            # This allows for faster sweeping by ignoring points
+            # with negligible IMD
+            spectrumAnalyser.trigger_measurement()
+            noiseFloor = measure_power(f1)
+
+            channel1.enable_output()
+            channel2.enable_output()
+
+            power = lowerPowerLimit
+            while power <= upperPowerLimit:
+                channel1.set_power(power + 3.3)
+                channel2.set_power(power + 3.3)
                 spectrumAnalyser.trigger_measurement()
-                noiseFloor = measure_power(f1)
 
-                channel1.enable_output()
-                channel2.enable_output()
+                newDatapoint = IMDMeasurementPoint(toneSetpoint=power)
 
-                power = lowerPowerLimit
-                while power <= upperPowerLimit:
-                    channel1.set_power(power + 3.3)
-                    channel2.set_power(power + 3.3)
-                    spectrumAnalyser.trigger_measurement()
+                newDatapoint.imdPoints[1.1] = measure_power(f2)
+                newDatapoint.imdPoints[1] = measure_power(f1)
 
-                    newDatapoint = IMDMeasurementPoint(toneSetpoint=power)
+                # Iterate over all the requested intermod measurements
+                for x in intermodTerms:
+                    newDatapoint.imdPoints[(x + 0.1)] = measure_power(
+                        0.5 * (x + 1) * f2 - 0.5 * (x - 1) * f1
+                    )
+                    newDatapoint.imdPoints[(x)] = measure_power(
+                        0.5 * (x + 1) * f1 - 0.5 * (x - 1) * f2
+                    )
 
-                    newDatapoint.imdPoints[1.1] = measure_power(f2)
-                    newDatapoint.imdPoints[1] = measure_power(f1)
+                datapoints.append(newDatapoint)
 
-                    # Iterate over all the requested intermod measurements
-                    for x in intermodTerms:
-                        newDatapoint.imdPoints[(x + 0.1)] = measure_power(
-                            0.5 * (x + 1) * f2 - 0.5 * (x - 1) * f1
-                        )
-                        newDatapoint.imdPoints[(x)] = measure_power(
-                            0.5 * (x + 1) * f1 - 0.5 * (x - 1) * f2
-                        )
+                # Go in 2dB steps if negligible IMD else go in 1dB steps
+                if measure_power(2 * f2 - f1) > noiseFloor + 3:
+                    power += 1
+                else:
+                    power += 2
 
-                    datapoints.append(newDatapoint)
+            # Save sweep to dictionary of IMD sweeps
+            imdSweeps[freq] = datapoints
 
-                    # Go in 2dB steps if negligible IMD else go in 1dB steps
-                    if measure_power(2 * f2 - f1) > noiseFloor + 3:
-                        power += 1
-                    else:
-                        power += 2
-
-                # Save sweep to dictionary of IMD sweeps
-                imdSweeps[freq] = datapoints
-
-            # Save results
-            with open("imdTest.P", "wb") as pickleFile:
-                pickle.dump(imdSweeps, pickleFile)
+        # Save results
+        with open("imdTest.P", "wb") as pickleFile:
+            pickle.dump(imdSweeps, pickleFile)
     else:
         # Load results from file
         with open(pickleFile, "rb") as savedData:
