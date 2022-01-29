@@ -8,10 +8,8 @@ from typing import Optional
 from AutomatedTesting.Instruments.NoiseSource.NoiseSource import NoiseSource
 from AutomatedTesting.Instruments.PSU.PSU import PowerSupplyChannel
 from AutomatedTesting.Instruments.SpectrumAnalyser import SpectrumAnalyser
-from AutomatedTesting.Instruments.SpectrumAnalyser.Agilent_E4407B import \
-    Agilent_E4407B
-from AutomatedTesting.Instruments.TopLevel.ExcelHandler import \
-    ExcelWorksheetWrapper
+from AutomatedTesting.Instruments.SpectrumAnalyser.Agilent_E4407B import Agilent_E4407B
+from AutomatedTesting.Instruments.TopLevel.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
 from numpy import linspace
 from xlsxwriter import Workbook
@@ -78,12 +76,14 @@ def run_noise_figure_test(
 
         noiseFigures = []
         gains = []
+        warnings = []
 
         for (freq, saOff, saOn, combinedOff, combinedOn) in zip(
             freqs, saOffList, saOnList, combinedOffList, combinedOnList
         ):
             enr = noiseSource.evaluate_enr(freq)
             sourceNoiseTemp = t0 * (1 + pow(10, enr / 10))
+            warning = False
 
             # Calculate DUT Gain
             saOffWatts = pow(10, saOff / 10)
@@ -91,62 +91,76 @@ def run_noise_figure_test(
             dutOffWatts = pow(10, combinedOff / 10)
             dutOnWatts = pow(10, combinedOn / 10)
 
-            dutGainLinear = (dutOnWatts - dutOffWatts) / (saOnWatts - saOffWatts)
-            dutGainDb = 10 * log10(dutGainLinear)
-
-            # Calculate Spectrum Analyser noise figure
-            saYFactor = saOnWatts / saOffWatts
-            saNoiseTemperature = (sourceNoiseTemp - saYFactor * t0) / (saYFactor - 1)
-            saNoiseFigure = enr - 10 * log10(saYFactor - 1)
-
-            # Calculate DUT + SA noise temperature
-            combinedYFactor = dutOnWatts / dutOffWatts
-            combinedNoiseTemp = (sourceNoiseTemp - combinedYFactor * t0) / (
-                combinedYFactor - 1
-            )
-            # combinedNoiseFigure = 10 * log10(1 + combinedNoiseTemp / t0)
-
-            # Calculate DUT Noise Figure
-            try:
-                dutNoiseTemp = combinedNoiseTemp - saNoiseTemperature / dutGainLinear
-                dutNoiseFigure = 10 * log10(1 + dutNoiseTemp / t0)
-
-                # Check SA noise figure is good enough for valid measurement
-                if enr < (saNoiseFigure + 3):
-                    logging.warning(
-                        f"Measurement at {readable_freq(freq)} may be invalid due to "
-                        f"insufficiently low NF of {spectrumAnalyser.name}"
-                    )
-
-                # Check ENR is high enough for valid measurement
-                if enr < (dutNoiseFigure + 5):
-                    logging.warning(
-                        f"Measurement at {readable_freq(freq)} may be invalid due to "
-                        f"insufficiently high ENR of {noiseSource.name}"
-                    )
-
-                # Check delta between calibration and measurement step are close enough to be valid
-                if (saNoiseFigure + 1) > (dutNoiseFigure + dutGainDb):
-                    logging.warning(
-                        f"Measurement at {readable_freq(freq)} may be invalid due to "
-                        f"excess noise figure being too close to calibration"
-                    )
-            except ValueError:
-                dutNoiseFigure = None
+            if (saOff > saOn) or (combinedOff > combinedOn):
                 logging.warning(
-                    f"NF of DUT + SA was less than NF of {spectrumAnalyser.name}"
+                    f"Output power with Noise Source off was greater than with Noise Source on at {readable_freq(freq)}. Ignoring datapoint"
                 )
+                dutGainDb = None
+                dutNoiseFigure = None
+            else:
+                dutGainLinear = (dutOnWatts - dutOffWatts) / (saOnWatts - saOffWatts)
+                dutGainDb = 10 * log10(dutGainLinear)
+
+                # Calculate Spectrum Analyser noise figure
+                saYFactor = saOnWatts / saOffWatts
+                saNoiseTemperature = (sourceNoiseTemp - saYFactor * t0) / (
+                    saYFactor - 1
+                )
+                saNoiseFigure = enr - 10 * log10(saYFactor - 1)
+
+                # Calculate DUT + SA noise temperature
+                combinedYFactor = dutOnWatts / dutOffWatts
+                combinedNoiseTemp = (sourceNoiseTemp - combinedYFactor * t0) / (
+                    combinedYFactor - 1
+                )
+                # combinedNoiseFigure = 10 * log10(1 + combinedNoiseTemp / t0)
+
+                # Calculate DUT Noise Figure
+                dutNoiseTemp = combinedNoiseTemp - saNoiseTemperature / dutGainLinear
+                if dutNoiseTemp < 0:
+                    logging.warning(
+                        f"Combined NF of DUT and {spectrumAnalyser.name} less than NF of {spectrumAnalyser.name}. Ignoring datapoint"
+                    )
+                    dutNoiseFigure = None
+                else:
+                    dutNoiseFigure = 10 * log10(1 + dutNoiseTemp / t0)
+
+                    # Check SA noise figure is good enough for valid measurement
+                    if enr < (saNoiseFigure + 3):
+                        logging.warning(
+                            f"Measurement at {readable_freq(freq)} may be invalid due to "
+                            f"insufficiently low NF of {spectrumAnalyser.name}"
+                        )
+                        warning = True
+
+                    # Check ENR is high enough for valid measurement
+                    if enr < (dutNoiseFigure + 5):
+                        logging.warning(
+                            f"Measurement at {readable_freq(freq)} may be invalid due to "
+                            f"insufficiently high ENR of {noiseSource.name}"
+                        )
+                        warning = True
+
+                    # Check delta between calibration and measurement step are close enough to be valid
+                    if (saNoiseFigure + 1) > (dutNoiseFigure + dutGainDb):
+                        logging.warning(
+                            f"Measurement at {readable_freq(freq)} may be invalid due to "
+                            f"excess noise figure being too close to calibration"
+                        )
+                        warning = True
 
             gains.append(dutGainDb)
             noiseFigures.append(dutNoiseFigure)
+            warnings.append(warning)
+
         # Save results
         with open("noiseFigure.P", "wb") as pickleFile:
-            pickle.dump((freqs, noiseFigures, gains), pickleFile)
+            pickle.dump((freqs, noiseFigures, gains, warnings), pickleFile)
 
     else:
         # Load results from file
         with open(pickleFile, "rb") as savedData:
-            freqs, noiseFigures, gains = pickle.load(savedData)
+            freqs, noiseFigures, gains, warnings = pickle.load(savedData)
 
     ###################
     # Process results #
@@ -162,13 +176,15 @@ def run_noise_figure_test(
         worksheet.write_and_move_right("Frequency (MHz)")
         worksheet.write_and_move_right("Gain (dB)")
         worksheet.write_and_move_right("Noise Figure (dB)")
+        worksheet.write_and_move_right("Warnings on measurement?")
         worksheet.new_row()
         worksheet.headersColumn = "A"
 
-        for f, g, nf in zip(freqs, gains, noiseFigures):
+        for f, g, nf, w in zip(freqs, gains, noiseFigures, warnings):
             worksheet.write_and_move_right(f / 1e6)
             worksheet.write_and_move_right(g)
             worksheet.write_and_move_right(nf)
+            worksheet.write_and_move_right("Y" if w else "")
             worksheet.new_row()
 
         # Plot Noise Figure
