@@ -22,7 +22,7 @@ class Agilent_E4407B(SpectrumAnalyser):
             name=name,
             minFreq=9e3,
             maxFreq=26.5e9,
-            timeout=40000,
+            timeout=None,
         )
         self.enableDisplay = enableDisplay
         self.enableAutoAlign = enableAutoAlign
@@ -172,7 +172,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         Raises:
             None
         """
-        if isinstance(vbw, int):
+        if isinstance(vbw, (int, float)):
             assert 1 <= vbw < 5e6
             self._write(f"BAND:VID {readable_freq(vbw)}")
             logging.debug(f"{self.name} set VBW to {readable_freq(vbw)}")
@@ -185,6 +185,21 @@ class Agilent_E4407B(SpectrumAnalyser):
                     f"Unable to set VBW of {self.name} to " f'"{readable_freq(vbw)}"'
                 )
                 raise ValueError
+
+    def enable_averaging(self, enabled: bool = True):
+        if enabled:
+            self._write(":AVER:STAT ON")
+            logging.debug(f"{self.name} enabled averaging")
+        else:
+            self._write(":AVER:STAT OFF")
+            logging.debug(f"{self.name} disabled averaging")
+
+    def disable_averaging(self):
+        self.enable_averaging(False)
+
+    def set_num_averages(self, x):
+        self._write(f":AVER:COUN {int(x)}")
+        logging.debug(f"{self.name} set number of averages to {x}")
 
     def set_sweep_points(self, numPoints):
         """
@@ -224,6 +239,12 @@ class Agilent_E4407B(SpectrumAnalyser):
         else:
             self._write(f":SWE:TIME {sweepTime}ms")
             logging.debug(f"{self.name} set sweep time to {sweepTime}ms")
+
+    def read_sweep_time(self) -> float:
+        """
+        Returns sweep time in ms
+        """
+        return float(self._query(":SWE:TIME?"))
 
     def measure_power_zero_span(self, freq):
         """

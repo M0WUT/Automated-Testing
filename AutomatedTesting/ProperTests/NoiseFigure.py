@@ -1,8 +1,8 @@
 import logging
 import pickle
-import time
 from datetime import datetime
 from math import log10
+from time import sleep
 from typing import Optional
 
 from AutomatedTesting.Instruments.NoiseSource.NoiseSource import NoiseSource
@@ -22,8 +22,11 @@ def run_noise_figure_test(
     psu: PowerSupplyChannel,
     noiseSource: NoiseSource,
     numFreqPoints: int = 401,
+    calRefLevel: int = -85,
+    caldBPerDiv: int = 2,
+    dutRefLevel: int = -45,
+    dutdBPerDiv: int = 5,
     t0=290,
-    sweepTime: float = 10,
     resultsDirectory: str = "/mnt/Transit",
     pickleFile: Optional[str] = None,
 ):
@@ -41,10 +44,14 @@ def run_noise_figure_test(
         spectrumAnalyser.set_sweep_points(numFreqPoints)
         spectrumAnalyser.set_rms_detector_mode()
         spectrumAnalyser.set_rbw(30e3)
-        spectrumAnalyser.set_ref_level(-60)
+        if spectrumAnalyser.read_sweep_time() < 10000:
+            spectrumAnalyser.set_sweep_time(10000)
+        sleep(3)
+        spectrumAnalyser.set_ref_level(0)
         spectrumAnalyser.set_ampl_scale(5)
         spectrumAnalyser.set_input_attenuator(0)
-        spectrumAnalyser.set_sweep_time(int(1000 * sweepTime))
+        spectrumAnalyser.set_num_averages(10)
+        spectrumAnalyser.enable_averaging()
 
         freqs = linspace(minFreq, maxFreq, numFreqPoints)
 
@@ -54,12 +61,16 @@ def run_noise_figure_test(
         )
 
         # Measure noise of spectrum analyser
+        spectrumAnalyser.set_ref_level(calRefLevel)
+        spectrumAnalyser.set_ampl_scale(caldBPerDiv)
         saOffList = spectrumAnalyser.get_trace_data()
         psu.enable_output()
-        time.sleep(2)
+        sleep(2)
         saOnList = spectrumAnalyser.get_trace_data()
         psu.disable_output()
-        time.sleep(2)
+        sleep(2)
+        spectrumAnalyser.set_ref_level(dutRefLevel)
+        spectrumAnalyser.set_ampl_scale(dutdBPerDiv)
 
         # Measure with DUT
         input(
@@ -69,10 +80,10 @@ def run_noise_figure_test(
         # Measure combined noise of spectrum analyser + DUT
         combinedOffList = spectrumAnalyser.get_trace_data()
         psu.enable_output()
-        time.sleep(2)
+        sleep(2)
         combinedOnList = spectrumAnalyser.get_trace_data()
         psu.disable_output()
-        time.sleep(2)
+        sleep(2)
 
         noiseFigures = []
         gains = []

@@ -26,12 +26,4 @@ with TestSupervisor(
 ):
     psu = tenmaSingleChannel.reserve_channel(1, "Power Supply")
 
-    run_noise_figure_test(
-        10e6,
-        6e9,
-        e4407b,
-        psu,
-        noiseSource,
-        1001,
-        sweepTime=30,  # , pickleFile="noiseFigure.P"
-    )
+    run_noise_figure_test(10e6, 50e6, e4407b, psu, noiseSource, 1001)
