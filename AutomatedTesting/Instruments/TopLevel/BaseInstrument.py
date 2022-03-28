@@ -13,7 +13,7 @@ from AutomatedTesting.Instruments.TopLevel.ProcessWIthCleanStop import (
 
 
 class BaseInstrument:
-    def __init__(self, address, id, name, **kwargs):
+    def __init__(self, address, id, name, verify: bool = True, **kwargs):
         """
         Parent class for all Test Equipment
         This should never be implemented directly
@@ -34,7 +34,8 @@ class BaseInstrument:
 
         self.resourceManager = None
         self.address = address
-        self.kwargs = kwargs
+        self.verify = verify
+        self.kwargs = kwargs  # Needed to pass additional arguments to PyVisa
         self.dev = None
         self.lock = Lock()
         self.id = id
@@ -230,15 +231,16 @@ class BaseInstrument:
         """
         errorList = []
         errors = self._query("SYST:ERR?")
-        if errors != '+0,"No error"':
-            errorStrings = errors.split('",')
+        errorStrings = errors.split('",')
 
-            for x in errorStrings:
-                errorCode, errorMessage = x.split(',"')
-                # Last item in list isn't comma terminated so need
-                # to manually remove trailing speech marks
-                errorMessage.rstrip('"')
-                errorList.append((int(errorCode), errorMessage))
+        for x in errorStrings:
+            errorCode, errorMessage = x.strip('"').split(',"')
+            # Last item in list isn't comma terminated so need
+            # to manually remove trailing speech marks
+            errorCode = int(errorCode)
+            errorMessage.rstrip('"')
+            if errorCode:
+                errorList.append((errorCode, errorMessage))
         return errorList
 
     def check_instrument_errors(self, event):
@@ -289,6 +291,7 @@ class BaseInstrument:
             self.errorThread.terminate()
             self.errorThread = None
         self.close_remote_session()
+        self.dev.close()
         logging.info(f"{self.name} Shutdown")
 
     def close_remote_session(self):
@@ -306,4 +309,4 @@ class BaseInstrument:
         Raises:
             None
         """
-        self.dev.close()
+        pass

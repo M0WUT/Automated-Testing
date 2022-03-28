@@ -2,8 +2,7 @@ import logging
 from time import sleep
 
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    SpectrumAnalyser,
-)
+    DetectorMode, SpectrumAnalyser)
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
 
 
@@ -22,6 +21,11 @@ class Agilent_E4407B(SpectrumAnalyser):
             name=name,
             minFreq=9e3,
             maxFreq=26.5e9,
+            minSweepPoints=101,
+            maxSweepPoints=8192,
+            minSpan=100,
+            maxSpan=26.5e9,
+            hasPreamp=False,
             timeout=None,
         )
         self.enableDisplay = enableDisplay
@@ -61,78 +65,9 @@ class Agilent_E4407B(SpectrumAnalyser):
         try:
             self._write(":INIT:IMM", acquireLock=False)
             while self._query("*OPC?", acquireLock=False) == "1":
-                logging.critical("SLEEPING")
                 sleep(1)
         finally:
             self.lock.release()
-
-    def set_centre_freq(self, freq):
-        """
-        Sets centre frequency
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        assert 0 < freq < 26.5e9
-        self._write(f"FREQ:CENT {readable_freq(freq)}")
-        logging.debug(f"{self.name} set centre frequency to {readable_freq(freq)}")
-
-    def set_start_freq(self, freq):
-        """
-        Sets start frequency
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        assert 0 < freq < 26.5e9
-        self._write(f"FREQ:STAR {readable_freq(freq)}")
-        logging.debug(f"{self.name} set start frequency to {readable_freq(freq)}")
-
-    def set_stop_freq(self, freq):
-        """
-        Sets stop frequency
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        assert 0 < freq < 26.5e9
-        self._write(f"FREQ:STOP {readable_freq(freq)}")
-        logging.debug(f"{self.name} set stop frequency to {readable_freq(freq)}")
-
-    def set_span(self, freq):
-        """
-        Sets x axis span
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        assert 100 < freq < 26.5e9 or freq == 0
-        self._write(f"FREQ:SPAN {readable_freq(freq)}")
-        logging.debug(f"{self.name} set span to {readable_freq(freq)}")
 
     def set_rbw(self, rbw):
         """
@@ -186,65 +121,17 @@ class Agilent_E4407B(SpectrumAnalyser):
                 )
                 raise ValueError
 
-    def enable_averaging(self, enabled: bool = True):
-        if enabled:
+    def enable_averaging(self, numAverages: int = 10):
+        if numAverages:
             self._write(":AVER:STAT ON")
-            logging.debug(f"{self.name} enabled averaging")
+            self._write(f":AVER:COUN {int(numAverages)}")
+            logging.debug(f"{self.name} set number of averages to {numAverages}")
         else:
             self._write(":AVER:STAT OFF")
             logging.debug(f"{self.name} disabled averaging")
 
     def disable_averaging(self):
-        self.enable_averaging(False)
-
-    def set_num_averages(self, x):
-        self._write(f":AVER:COUN {int(x)}")
-        logging.debug(f"{self.name} set number of averages to {x}")
-
-    def set_sweep_points(self, numPoints):
-        """
-        Sets Number of Points in sweep
-
-        Args:
-           vbw (float): VBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        assert 101 <= numPoints <= 8192
-        self._write(f":SWE:POIN {numPoints}")
-        logging.debug(f"{self.name} set number of points to {numPoints}")
-
-    def get_sweep_points(self) -> int:
-        return int(self._query(":SWE:POIN?"))
-
-    def set_sweep_time(self, sweepTime):
-        """
-        Sets Sweep time in ms
-
-        Args:
-           sweepTime (float): sweep time in ms, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if sweepTime == "auto":
-            self._write(":SWE:TIME:AUTO ON")
-        else:
-            self._write(f":SWE:TIME {sweepTime}ms")
-            logging.debug(f"{self.name} set sweep time to {sweepTime}ms")
-
-    def read_sweep_time(self) -> float:
-        """
-        Returns sweep time in ms
-        """
-        return float(self._query(":SWE:TIME?"))
+        self.enable_averaging(0)
 
     def measure_power_zero_span(self, freq):
         """
@@ -317,32 +204,6 @@ class Agilent_E4407B(SpectrumAnalyser):
         assert 0.1 <= dbPerDiv <= 20
         self._write(f"DISP:WIND:TRAC:Y:PDIV {round(dbPerDiv, 1)}")
 
-    """
-    def get_trace_data(self):
-        traceData = []
-        self.trigger_measurement()
-
-        # First number is how many digits are in length field
-        data = self._query_raw(":TRAC? TRACE1")
-        print(data)
-        lengthOfLength = int(chr(data[1]))
-        length = 0
-        lengthBytes = data[2 : (2 + lengthOfLength)]
-        for x in lengthBytes:
-            length = length * 10 + int(chr(x))
-
-        length = int(length / 4)  # 32 bit values so 4 bytes per value
-        index = 2 + lengthOfLength  # First index worth reading
-
-        for x in range(length):
-            dataPoint = data[index : index + 4]
-            traceData.append(
-                int.from_bytes(dataPoint, byteorder="big", signed=True) / 1000
-            )
-            index += 4
-        return traceData
-    """
-
     def get_trace_data(self) -> list[float]:
         self.trigger_measurement()
         data = self._query(":TRAC? TRACE1")
@@ -363,5 +224,8 @@ class Agilent_E4407B(SpectrumAnalyser):
         """
         return []
 
-    def set_rms_detector_mode(self):
-        self._write(":DET RMS")
+    def set_detector_mode(self, mode: DetectorMode):
+        if mode == DetectorMode.RMS:
+            self._write(":DET RMS")
+        else:
+            raise NotImplementedError

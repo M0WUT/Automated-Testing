@@ -6,6 +6,7 @@ from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
     Siglent_SDG2122X,
 )
 from AutomatedTesting.Instruments.SpectrumAnalyser.Agilent_E4407B import Agilent_E4407B
+from AutomatedTesting.Instruments.SpectrumAnalyser.Rigol_DSA815TG import Rigol_DSA815TG
 
 tenmaSingleChannel = Tenma_72_2535("ASRL/dev/ttyACM1::INSTR")
 smb100a = RandS_SMB100A("TCPIP::smb100a.secure::INSTR")
@@ -18,3 +19,4 @@ e4407b = Agilent_E4407B(
 # sdg2122x = Siglent_SDG2122X("USB::0xf4ec::0x1102::SDG2XCAX5R0800::INSTR")
 sdg2122x = Siglent_SDG2122X("TCPIP::sdg2042x.secure::INSTR")
 noiseSource = Noisecom_NC346()
+dsa815tg = Rigol_DSA815TG("TCPIP::10.59.73.14::INSTR")

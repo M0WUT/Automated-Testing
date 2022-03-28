@@ -1,2 +1,2 @@
 #!/bin/bash
-pytest --skipSmb100a --skipSdg2122x --cov-report term-missing --cov=. unit-tests/ --cache-clear #--flake8 .
+pytest --skipSmb100a --skipSdg2122x --skipPSU --full-trace --cov-report term-missing --cov=. unit-tests/ --cache-clear #--flake8 .

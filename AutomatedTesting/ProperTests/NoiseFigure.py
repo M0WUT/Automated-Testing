@@ -18,13 +18,13 @@ from xlsxwriter import Workbook
 def run_noise_figure_test(
     minFreq: int,
     maxFreq: int,
-    spectrumAnalyser: Agilent_E4407B,
+    spectrumAnalyser: SpectrumAnalyser,
     psu: PowerSupplyChannel,
     noiseSource: NoiseSource,
     numFreqPoints: int = 401,
-    calRefLevel: int = -85,
-    caldBPerDiv: int = 2,
-    dutRefLevel: int = -45,
+    calRefLevel: int = -65,
+    caldBPerDiv: int = 5,
+    dutRefLevel: int = -60,
     dutdBPerDiv: int = 5,
     t0=290,
     resultsDirectory: str = "/mnt/Transit",
@@ -43,15 +43,15 @@ def run_noise_figure_test(
         spectrumAnalyser.set_stop_freq(maxFreq)
         spectrumAnalyser.set_sweep_points(numFreqPoints)
         spectrumAnalyser.set_rms_detector_mode()
-        spectrumAnalyser.set_rbw(30e3)
+        spectrumAnalyser.set_rbw(10e3)
         if spectrumAnalyser.read_sweep_time() < 10000:
             spectrumAnalyser.set_sweep_time(10000)
         sleep(3)
         spectrumAnalyser.set_ref_level(0)
         spectrumAnalyser.set_ampl_scale(5)
         spectrumAnalyser.set_input_attenuator(0)
-        spectrumAnalyser.set_num_averages(10)
-        spectrumAnalyser.enable_averaging()
+        # spectrumAnalyser.set_num_averages(10)
+        # spectrumAnalyser.enable_averaging()
 
         freqs = linspace(minFreq, maxFreq, numFreqPoints)
 
