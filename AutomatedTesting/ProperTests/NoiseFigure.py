@@ -7,8 +7,11 @@ from typing import Optional
 
 from AutomatedTesting.Instruments.NoiseSource.NoiseSource import NoiseSource
 from AutomatedTesting.Instruments.PSU.PSU import PowerSupplyChannel
-from AutomatedTesting.Instruments.SpectrumAnalyser import SpectrumAnalyser
 from AutomatedTesting.Instruments.SpectrumAnalyser.Agilent_E4407B import Agilent_E4407B
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    DetectorMode,
+    SpectrumAnalyser,
+)
 from AutomatedTesting.Instruments.TopLevel.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
 from numpy import linspace
@@ -22,7 +25,7 @@ def run_noise_figure_test(
     psu: PowerSupplyChannel,
     noiseSource: NoiseSource,
     numFreqPoints: int = 401,
-    calRefLevel: int = -65,
+    calRefLevel: int = -90,
     caldBPerDiv: int = 5,
     dutRefLevel: int = -60,
     dutdBPerDiv: int = 5,
@@ -42,14 +45,17 @@ def run_noise_figure_test(
         spectrumAnalyser.set_start_freq(minFreq)
         spectrumAnalyser.set_stop_freq(maxFreq)
         spectrumAnalyser.set_sweep_points(numFreqPoints)
-        spectrumAnalyser.set_rms_detector_mode()
+        spectrumAnalyser.set_detector_mode(DetectorMode.RMS)
         spectrumAnalyser.set_rbw(10e3)
+        spectrumAnalyser.set_vbw_rbw_ratio(0.1)
         if spectrumAnalyser.read_sweep_time() < 10000:
             spectrumAnalyser.set_sweep_time(10000)
         sleep(3)
         spectrumAnalyser.set_ref_level(0)
         spectrumAnalyser.set_ampl_scale(5)
         spectrumAnalyser.set_input_attenuator(0)
+        if spectrumAnalyser.hasPreamp:
+            spectrumAnalyser.enable_preamp()
         # spectrumAnalyser.set_num_averages(10)
         # spectrumAnalyser.enable_averaging()
 
@@ -85,6 +91,7 @@ def run_noise_figure_test(
         psu.disable_output()
         sleep(2)
 
+        saNoiseFigures = []
         noiseFigures = []
         gains = []
         warnings = []
@@ -161,17 +168,22 @@ def run_noise_figure_test(
                         warning = True
 
             gains.append(dutGainDb)
+            saNoiseFigures.append(saNoiseFigure)
             noiseFigures.append(dutNoiseFigure)
             warnings.append(warning)
 
         # Save results
         with open("noiseFigure.P", "wb") as pickleFile:
-            pickle.dump((freqs, noiseFigures, gains, warnings), pickleFile)
+            pickle.dump(
+                (freqs, saNoiseFigures, noiseFigures, gains, warnings), pickleFile
+            )
 
     else:
         # Load results from file
         with open(pickleFile, "rb") as savedData:
-            freqs, noiseFigures, gains, warnings = pickle.load(savedData)
+            freqs, saNoiseFigures, noiseFigures, gains, warnings = pickle.load(
+                savedData
+            )
 
     ###################
     # Process results #
@@ -185,21 +197,25 @@ def run_noise_figure_test(
         worksheet.initialise("Noise Figure")
 
         worksheet.write_and_move_right("Frequency (MHz)")
+        worksheet.write_and_move_right("Spectrum Analyser Noise Figure (dB)")
         worksheet.write_and_move_right("Gain (dB)")
         worksheet.write_and_move_right("Noise Figure (dB)")
         worksheet.write_and_move_right("Warnings on measurement?")
         worksheet.new_row()
         worksheet.headersColumn = "A"
 
-        for f, g, nf, w in zip(freqs, gains, noiseFigures, warnings):
+        for f, g, saNf, nf, w in zip(
+            freqs, gains, saNoiseFigures, noiseFigures, warnings
+        ):
             worksheet.write_and_move_right(f / 1e6)
+            worksheet.write_and_move_right(saNf)
             worksheet.write_and_move_right(g)
             worksheet.write_and_move_right(nf)
             worksheet.write_and_move_right("Y" if w else "")
             worksheet.new_row()
 
         # Plot Noise Figure
-        worksheet.currentColumn = 2
+        worksheet.currentColumn = 3
         chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
         worksheet.chart = chart
         chart.set_title({"name": f"Noise Figure"})
@@ -224,7 +240,7 @@ def run_noise_figure_test(
         worksheet.plot_current_column()
 
         # Plot Gain
-        worksheet.currentColumn = 1
+        worksheet.currentColumn = 2
         chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
         worksheet.chart = chart
         chart.set_title({"name": f"Gain"})

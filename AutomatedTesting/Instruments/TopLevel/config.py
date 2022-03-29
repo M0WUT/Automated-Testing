@@ -8,7 +8,7 @@ from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
 from AutomatedTesting.Instruments.SpectrumAnalyser.Agilent_E4407B import Agilent_E4407B
 from AutomatedTesting.Instruments.SpectrumAnalyser.Rigol_DSA815TG import Rigol_DSA815TG
 
-tenmaSingleChannel = Tenma_72_2535("ASRL/dev/ttyACM1::INSTR")
+tenmaSingleChannel = Tenma_72_2535("ASRL/dev/ttyACM0::INSTR")
 smb100a = RandS_SMB100A("TCPIP::smb100a.secure::INSTR")
 u2001a = Agilent_U2001A("USB0::2391::11032::MY53150007::0::INSTR")
 e4407b = Agilent_E4407B(

@@ -76,7 +76,6 @@ class InstrumentSupervisor:
         if not self.shutdown:
             self.shutdown = True
             self.cleanup()
-            sys.exit(1)
         else:
             pass
 

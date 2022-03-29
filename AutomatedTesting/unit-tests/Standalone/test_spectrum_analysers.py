@@ -7,7 +7,7 @@ from AutomatedTesting.Instruments.TopLevel.InstrumentSupervisor import (
     InstrumentSupervisor,
 )
 
-instrumentsToTest = [dsa815tg, e4407b]
+instrumentsToTest = [dsa815tg]  # , e4407b]
 
 with InstrumentSupervisor() as tb:
 
@@ -120,7 +120,7 @@ with InstrumentSupervisor() as tb:
             tb.free_resource(dut)
 
     @pytest.mark.e4407b
-    def test_validate__sweep_points(dut):
+    def test_validate_sweep_points(dut):
         try:
             if dut.minSweepPoints:
                 dut.set_sweep_points(dut.minSweepPoints)

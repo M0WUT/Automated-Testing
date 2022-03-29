@@ -2,7 +2,9 @@ import logging
 from time import sleep
 
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    DetectorMode, SpectrumAnalyser)
+    DetectorMode,
+    SpectrumAnalyser,
+)
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
 
 
@@ -55,19 +57,7 @@ class Agilent_E4407B(SpectrumAnalyser):
         if not self.enableLowPhaseNoise:
             self._write(":FREQ:SYNT 3")
 
-        self.set_input_attenuator(10)
-
-        self._write(":INIT:CONT ON")
         super().cleanup()
-
-    def trigger_measurement(self):
-        self.lock.acquire()
-        try:
-            self._write(":INIT:IMM", acquireLock=False)
-            while self._query("*OPC?", acquireLock=False) == "1":
-                sleep(1)
-        finally:
-            self.lock.release()
 
     def set_rbw(self, rbw):
         """
@@ -187,27 +177,6 @@ class Agilent_E4407B(SpectrumAnalyser):
             None
         """
         self._write(f":DISP:WIND:TRAC:Y:RLEV {refLevel}")
-
-    def set_input_attenuator(self, attenuation: int) -> None:
-        self._write(f"POW:ATT {attenuation}")
-
-    def set_ampl_scale(self, dbPerDiv: float) -> None:
-        """
-        Sets y-axis scale in dB/div
-
-        Args:
-            dbPerDiv: Requested number of dB per division
-
-        Returns:
-            None
-        """
-        assert 0.1 <= dbPerDiv <= 20
-        self._write(f"DISP:WIND:TRAC:Y:PDIV {round(dbPerDiv, 1)}")
-
-    def get_trace_data(self) -> list[float]:
-        self.trigger_measurement()
-        data = self._query(":TRAC? TRACE1")
-        return [float(x) for x in data.split(",")]
 
     def read_instrument_errors(self):
         """

@@ -1,10 +1,12 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
+from time import sleep
 from typing import Optional
 
 from AutomatedTesting.Instruments.TopLevel.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
+from pyvisa import VisaIOError
 
 
 class DetectorMode(Enum):
@@ -58,7 +60,15 @@ class SpectrumAnalyser(BaseInstrument):
 
     def initialise(self, *args, **kwargs):
         super().initialise(*args, **kwargs)
+        self._write(":INIT:CONT 0")
         logging.info(f"{self.name} initialised")
+
+    def cleanup(self):
+        self.set_input_attenuator(10)
+        if self.hasPreamp:
+            self.disable_preamp()
+        self._write(":INIT:CONT 1")
+        super().cleanup()
 
     def set_centre_freq(self, freq):
         """
@@ -213,13 +223,17 @@ class SpectrumAnalyser(BaseInstrument):
         Raises:
             None
         """
-        assert self.minSweepPoints
-        if not (self.minSweepPoints <= numPoints <= self.maxSweepPoints):
-            raise ValueError
-        self._write(f":SWE:POIN {numPoints}")
-        if self.verify:
-            assert self.read_sweep_points() == numPoints
-        logging.debug(f"{self.name} set number of points to {numPoints}")
+        if not self.minSweepPoints:
+            logging.warning(
+                f"{self.name} does not allow setting of number of sweep points. Ignoring command"
+            )
+        else:
+            if not (self.minSweepPoints <= numPoints <= self.maxSweepPoints):
+                raise ValueError
+            self._write(f":SWE:POIN {numPoints}")
+            if self.verify:
+                assert self.read_sweep_points() == numPoints
+            logging.debug(f"{self.name} set number of points to {numPoints}")
 
     def read_sweep_points(self) -> int:
         assert self.minSweepPoints
@@ -288,6 +302,139 @@ class SpectrumAnalyser(BaseInstrument):
         if self.verify:
             assert not self.read_preamp_state()
 
+    def set_ref_level(self, power: float) -> None:
+        """
+        Sets amplitude reference
+
+        Args:
+            power (float): Reference Level in dBm
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self._write(f":DISP:WINDow:TRAC:Y:RLEV {power}")
+        if self.verify:
+            assert self.read_ref_level() == power
+
+    def read_ref_level(self) -> float:
+        """
+        Returns amplitude reference
+
+        Args:
+            None
+
+        Returns:
+            float: Reference Level in dBm
+
+        Raises:
+            None
+        """
+        return float(self._query(":DISP:WINDow:TRAC:Y:RLEV?"))
+
+    def set_ampl_scale(self, dBperDiv: float) -> None:
+        """
+        Sets y-axis scale
+
+        Args:
+            dBperDiv (float): dB per division
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested value is out of allowed range
+            AssertionError: If readback value is incorrect
+        """
+        if not 0.1 <= dBperDiv <= 20:
+            raise ValueError
+
+        self._write(f":DISP:WINDow:TRAC:Y:PDIV {dBperDiv}")
+        if self.verify:
+            assert self.read_ampl_scale() == dBperDiv
+
+    def read_ampl_scale(self) -> float:
+        """
+        Reads y-axis scale
+
+        Args:
+            None
+
+        Returns:
+            float: Y-axis scale in dB per division
+
+        Raises:
+            None
+        """
+        return float(self._query(":DISP:WINDow:TRAC:Y:PDIV?"))
+
+    def set_input_attenuator(self, att: float) -> None:
+        """
+        Sets input attenuation
+
+        Args:
+            att (float): attenuation in dB
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested value is out of allowed range
+            AssertionError: If readback value is incorrect
+        """
+        self._write(f":POW:ATT {att}")
+        if self.verify:
+            assert self.read_input_attenuator() == att
+
+    def read_input_attenuator(self) -> float:
+        """
+        Reads input attenuation
+
+        Args:
+            None
+
+        Returns:
+            float: Input attenuation in dB
+
+        Raises:
+            None
+        """
+        return float(self._query(":POW:ATT?"))
+
+    def trigger_measurement(self):
+        """
+        Triggers a measurement
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.lock.acquire()
+
+        try:
+            self._write(":INIT:IMM", acquireLock=False)
+            running = True
+            while running:
+                try:
+                    running = self._query("*OPC?", acquireLock=False) == "0"
+                except VisaIOError:
+                    pass
+                sleep(1)
+        finally:
+            self.lock.release()
+
+    def get_trace_data(self) -> list[float]:
+        self.trigger_measurement()
+        data = self._query(":TRAC? TRACE1")
+        return [float(x) for x in data.split(",")]
+
     ##########################################################
     ## Functions for which no generic implementation exists ##
     ##########################################################
@@ -301,6 +448,21 @@ class SpectrumAnalyser(BaseInstrument):
 
         Returns:
             None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    def read_rbw(self) -> int:
+        """
+        Returns Resolution Bandwidth
+
+        Args:
+           None
+
+        Returns:
+            int: RBW in Hz
 
         Raises:
             None
@@ -322,6 +484,37 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError
 
+    def set_vbw_rbw_ratio(self, ratio: float) -> None:
+        """
+        Sets VBW:RBW ratio
+
+        Args:
+           ratio (float): Desired VBW:RBW ratio
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested ratio is not supported
+            AssertionError: If readback fails
+        """
+        raise NotImplementedError
+
+    def read_vbw_rbw_ratio(self) -> float:
+        """
+        Returns VBW:RBW ratio
+
+        Args:
+           None
+
+        Returns:
+            float: VBW:RBW ratio
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
     def measure_power(self, freq: int) -> float:
         """
         Measures RF Power
@@ -332,36 +525,6 @@ class SpectrumAnalyser(BaseInstrument):
 
         Returns:
             float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def set_ref_level(self, power: float) -> None:
-        """
-        Sets amplitude reference
-
-        Args:
-            power (float): Reference Level in dBm
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def trigger_measurement(self) -> None:
-        """
-        Triggers a measurement
-
-        Args:
-            None
-
-        Returns:
-            None
 
         Raises:
             None
@@ -422,6 +585,21 @@ class SpectrumAnalyser(BaseInstrument):
 
         Returns:
             None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    def read_detector_mode(self) -> DetectorMode:
+        """
+        Sets detector mode
+
+        Args:
+            None
+
+        Returns:
+            DetectorMode: Detector mode
 
         Raises:
             None
