@@ -218,7 +218,7 @@ def run_noise_figure_test(
         worksheet.currentColumn = 3
         chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
         worksheet.chart = chart
-        chart.set_title({"name": f"Noise Figure"})
+        chart.set_title({"name": "Noise Figure"})
         chart.set_size({"x_scale": 2, "y_scale": 2})
         chart.set_x_axis(
             {

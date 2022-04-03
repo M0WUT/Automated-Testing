@@ -431,9 +431,61 @@ class SpectrumAnalyser(BaseInstrument):
             self.lock.release()
 
     def get_trace_data(self) -> list[float]:
+        """
+        Returns trace data
+
+        Args:
+            None
+
+        Returns:
+            list[float]: y axis value of each datapoint
+
+        Raises:
+            None
+        """
         self.trigger_measurement()
         data = self._query(":TRAC? TRACE1")
         return [float(x) for x in data.split(",")]
+
+    def set_detector_mode(self, mode: DetectorMode) -> None:
+        """
+        Sets detector mode
+
+        Args:
+            mode (DetectorMode): Detector Mode
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        if mode == DetectorMode.RMS:
+            self._write(":DET RMS")
+        else:
+            raise NotImplementedError
+
+        if self.verify:
+            assert self.read_detector_mode() == mode
+
+    def read_detector_mode(self) -> DetectorMode:
+        """
+        Sets detector mode
+
+        Args:
+            None
+
+        Returns:
+            DetectorMode: Detector mode
+
+        Raises:
+            None
+        """
+        ret = self._query(":DET?")
+        if ret == "RMS":
+            return DetectorMode.RMS
+        else:
+            raise NotImplementedError(ret)
 
     ##########################################################
     ## Functions for which no generic implementation exists ##
@@ -484,6 +536,21 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError
 
+    def read_vbw(self) -> int:
+        """
+        Returns Video Bandwidth
+
+        Args:
+           None
+
+        Returns:
+            int: VBW in Hz
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
     def set_vbw_rbw_ratio(self, ratio: float) -> None:
         """
         Sets VBW:RBW ratio
@@ -515,13 +582,29 @@ class SpectrumAnalyser(BaseInstrument):
         """
         raise NotImplementedError
 
-    def measure_power(self, freq: int) -> float:
+    def measure_power_marker(self, freq: int) -> float:
         """
-        Measures RF Power
+        Measures RF Power by putting a marker at frequency 'freq'
 
         Args:
             freq (float): Frequency of measured signal
-                (Used for power correction)
+
+
+        Returns:
+            float: Measured power in dBm
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    def measure_power_zero_span(self, freq: int) -> float:
+        """
+        Measures RF Power by setting centre frequency to 'freq'
+        and span to 0. Returns max value seen
+
+        Args:
+            freq (float): Frequency of measured signal
 
         Returns:
             float: Measured power in dBm
@@ -555,51 +638,6 @@ class SpectrumAnalyser(BaseInstrument):
 
         Returns:
             None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def read_trace_data(self) -> list[float]:
-        """
-        Returns y-axis value for each points in y-axis units
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def set_detector_mode(self, mode: DetectorMode) -> None:
-        """
-        Sets detector mode
-
-        Args:
-            mode (DetectorMode): Detector Mode
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def read_detector_mode(self) -> DetectorMode:
-        """
-        Sets detector mode
-
-        Args:
-            None
-
-        Returns:
-            DetectorMode: Detector mode
 
         Raises:
             None

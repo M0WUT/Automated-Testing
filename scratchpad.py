@@ -22,9 +22,9 @@ TIMEOUT = 1
 
 with TestSupervisor(
     loggingLevel=logging.DEBUG,
-    instruments=[dsa815tg, noiseSource, tenmaSingleChannel],
+    instruments=[e4407b, noiseSource, tenmaSingleChannel],
     saveResults=False,
 ):
     psu = tenmaSingleChannel.reserve_channel(1, "Power Supply")
 
-    run_noise_figure_test(200e6, 1300e6, dsa815tg, psu, noiseSource, 601)
+    run_noise_figure_test(200e6, 1300e6, e4407b, psu, noiseSource, 601)

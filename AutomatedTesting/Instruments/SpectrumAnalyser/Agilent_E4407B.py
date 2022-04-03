@@ -1,5 +1,6 @@
 import logging
 from time import sleep
+from typing import Union
 
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     DetectorMode,
@@ -59,22 +60,19 @@ class Agilent_E4407B(SpectrumAnalyser):
 
         super().cleanup()
 
+    def read_detector_mode(self) -> DetectorMode:
+        ret = self._query(":DET?")
+        if ret == "AVER":
+            return DetectorMode.RMS
+        else:
+            raise NotImplementedError(ret)
+
     def set_rbw(self, rbw):
-        """
-        Sets Resolution Bandwidth
-
-        Args:
-           rbw (int): RBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
         if isinstance(rbw, (int, float)):
             assert 1 <= rbw < 5e6
             self._write(f"BAND {readable_freq(rbw)}")
+            if self.verify:
+                assert self.read_rbw() == rbw
             logging.debug(f"{self.name} set RBW to {readable_freq(rbw)}")
         else:
             if rbw.lower() == "auto":
@@ -84,22 +82,15 @@ class Agilent_E4407B(SpectrumAnalyser):
                 logging.error(f'Unable to set RBW of {self.name} to "{rbw}"')
                 raise ValueError
 
+    def read_rbw(self) -> float:
+        return float(self._query("BAND?"))
+
     def set_vbw(self, vbw):
-        """
-        Sets Video Bandwidth
-
-        Args:
-           vbw (float): VBW in Hz, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
         if isinstance(vbw, (int, float)):
             assert 1 <= vbw < 5e6
             self._write(f"BAND:VID {readable_freq(vbw)}")
+            if self.verify:
+                assert self.read_vbw() == vbw
             logging.debug(f"{self.name} set VBW to {readable_freq(vbw)}")
         else:
             if vbw.lower() == "auto":
@@ -110,6 +101,39 @@ class Agilent_E4407B(SpectrumAnalyser):
                     f"Unable to set VBW of {self.name} to " f'"{readable_freq(vbw)}"'
                 )
                 raise ValueError
+
+    def read_vbw(self) -> float:
+        return float(self._query("BAND:VID?"))
+
+    def set_vbw_rbw_ratio(self, ratio: float) -> None:
+        if not 0.00001 <= ratio <= 3e6:
+            raise ValueError
+
+        self._write(f":BAND:VID:RAT {ratio}")
+
+        if self.verify:
+            assert self.read_vbw_rbw_ratio() == ratio
+
+        logging.debug(f"{self.name} set VBW:RBW ratio to {ratio}")
+
+    def read_vbw_rbw_ratio(self) -> float:
+        return float(self._query("BAND:VID:RAT?"))
+
+    def measure_power_marker(self, freq):
+        self._write(":CALC:MARK:STAT ON")
+        self._write(":CALC:MARK:MODE POS")
+        self._write(f":CALC:MARK:X {int(freq)}")
+        return float(self._query(":CALC:MARK:Y?"))
+
+    def measure_power_zero_span(self, freq):
+        self.set_span(0)
+        self.set_sweep_points(101)
+        self.set_sweep_time(10)
+
+        self.set_centre_freq(freq)
+        self.trigger_measurement()
+        self._write(":CALC:MARK:MAX")
+        return float(self._query(":CALC:MARK:Y?").strip())
 
     def enable_averaging(self, numAverages: int = 10):
         if numAverages:
@@ -122,61 +146,6 @@ class Agilent_E4407B(SpectrumAnalyser):
 
     def disable_averaging(self):
         self.enable_averaging(0)
-
-    def measure_power_zero_span(self, freq):
-        """
-        Measures RF Power
-
-        Args:
-            freq (float): Frequency of measured signal
-                (Used for power correction)
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        self.set_span(0)
-        self.set_sweep_points(101)
-        self.set_sweep_time(10)
-
-        self.set_centre_freq(freq)
-        self.trigger_measurement()
-        self._write(":CALC:MARK:MAX")
-        measuredPower = float(self._query(":CALC:MARK:Y?").strip())
-        return measuredPower
-
-    def measure_power_marker(self, freq):
-        """
-        Measures RF Power using a marker
-
-        Args:
-            freq (float): Frequency of measured signal
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        self._write(":CALC:MARK:STAT ON")
-        self._write(":CALC:MARK:MODE POS")
-        self._write(f":CALC:MARK:X {int(freq)}")
-        measuredPower = float(self._query(":CALC:MARK:Y?"))
-        return measuredPower
-
-    def set_ref_level(self, refLevel: int) -> None:
-        """
-        Sets reference level
-
-        Args:
-            refLevel: new reference level in dBm
-
-        Returns:
-            None
-        """
-        self._write(f":DISP:WIND:TRAC:Y:RLEV {refLevel}")
 
     def read_instrument_errors(self):
         """
@@ -192,9 +161,3 @@ class Agilent_E4407B(SpectrumAnalyser):
             None
         """
         return []
-
-    def set_detector_mode(self, mode: DetectorMode):
-        if mode == DetectorMode.RMS:
-            self._write(":DET RMS")
-        else:
-            raise NotImplementedError

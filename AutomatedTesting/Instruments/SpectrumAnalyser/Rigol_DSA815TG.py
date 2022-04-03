@@ -40,22 +40,6 @@ class Rigol_DSA815TG(SpectrumAnalyser):
     def read_preamp_state(self) -> bool:
         return self._query(":POW:GAIN?") == "1"
 
-    def set_detector_mode(self, mode: DetectorMode) -> None:
-        if mode == DetectorMode.RMS:
-            self._write(":DET RMS")
-        else:
-            raise NotImplementedError
-
-        if self.verify:
-            assert self.read_detector_mode() == mode
-
-    def read_detector_mode(self) -> DetectorMode:
-        ret = self._query(":DET?")
-        if ret == "RMS":
-            return DetectorMode.RMS
-        else:
-            raise NotImplementedError
-
     def set_rbw(self, rbw: int) -> None:
         self._write(f":BAND {int(rbw)}")
         assert self.read_rbw() == rbw
