@@ -9,9 +9,9 @@ from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
 from pyvisa import ResourceManager
 
 
-class Siglent_SDG2122X(SignalGenerator):
+class Agilent_E4433B(SignalGenerator):
     """
-    Class for Siglent SDG2122X
+    Class for Agilent E4433B
     """
 
     def __init__(
@@ -28,20 +28,10 @@ class Siglent_SDG2122X(SignalGenerator):
             channelNumber=1,
             instrument=self,
             logger=logger,
-            maxPower=30,
-            minPower=-50,
-            maxFreq=120e6,
-            minFreq=1e-6,
-        )
-
-        channel2 = SignalGeneratorChannel(
-            channelNumber=2,
-            instrument=self,
-            logger=logger,
-            maxPower=30,
-            minPower=-50,
-            maxFreq=120e6,
-            minFreq=1e-6,
+            maxPower=13,
+            minPower=-136,
+            maxFreq=4e9,
+            minFreq=250e3,
         )
 
         super().__init__(
@@ -50,70 +40,71 @@ class Siglent_SDG2122X(SignalGenerator):
             instrumentName=instrumentName,
             expectedIdnResponse=expectedIdnResponse,
             verify=verify,
-            channelCount=2,
-            channels=[channel1, channel2],
+            channelCount=1,
+            channels=[channel1],
             logger=logger,
             **kwargs,
         )
 
-    def get_instrument_errors(self):
-        return []  # Doesn't appear to be implemented in the device
+    def __enter__(self):
+        super().__enter()
+        assert self._query("*TST?") == "0"
+        return self
 
     def get_channel_errors(self, channelNumber: int) -> list[Tuple[int, str]]:
-        return []  # Doesn't appear to be implemented in the device
+        return []  # Doesn't have channel specific errors
 
     def set_channel_output_state(self, channelNumber: int, enabled: bool):
-        self._write(f"C{channelNumber}:OUTP {'ON' if enabled else 'OFF'}")
+        # Single channel instrument so ignore channelNumber
+        self._write(f":OUTP {'ON' if enabled else 'OFF'}")
 
     def get_channel_output_state(self, channelNumber: int) -> bool:
-        response = self._query(f"C{channelNumber}:OUTP?")
-        state = response.split("OUTP ")[1].split(",")[0]
-        return state == "ON"
+        # Single channel instrument so ignore channelNumber
+        response = self._query(":OUTP?")
+        return response == "ON"
 
     def set_channel_power(self, channelNumber: int, power: float):
-        self._write(f"C{channelNumber}:BSWV AMPDBM,{power}")
+        # Single channel instrument so ignore channelNumber
+        self._write(f":POW{power}")
 
     def get_channel_power(self, channelNumber: int) -> float:
-        channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        return float(channelStatus.split("AMPDBM,")[1].split("d")[0])
+        # Single channel instrument so ignore channelNumber
+        response = self._query(":POW?")
+        return response
 
     def set_channel_freq(self, channelNumber: int, freq: float):
-        self._write(f"C{channelNumber}:BSWV FRQ,{freq}")
+        # Single channel instrument so ignore channelNumber
+        self._write(f":FREQ {freq}")
 
     def get_channel_freq(self, channelNumber: int) -> float:
-        channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        freq = float(channelStatus.split("FRQ,")[1].split("HZ")[0])
-        return freq
+        # Single channel instrument so ignore channelNumber
+        response = self._query(":FREQ?")
+        return float(response)
 
     def set_channel_modulation(
         self, channelNumber: int, modulation: SignalGeneratorModulation
     ):
+        # Single channel instrument so ignore channelNumber
         if modulation == SignalGeneratorModulation.NONE:
-            self._write(f"C{channelNumber}:BSWV WVTP SINE")
+            self._write(f"OUTP:MOD OFF")
         else:
             raise NotImplementedError
 
     def get_channel_modulation(
         self, channelNumber: int
     ) -> SignalGeneratorModulation:
-        channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        modulation = channelStatus.split(",")[1]
-        if modulation == "SINE":
+        # Single channel instrument so ignore channelNumber
+        response = self._query(":OUTP:MOD?")
+        if response == "0":
             return SignalGeneratorModulation.NONE
         else:
             raise NotImplementedError
 
     def set_channel_load_impedance(self, channelNumber: int, impedance: float):
-        if impedance == float("inf"):
-            self._write(f"C{channelNumber}:OUTP LOAD,HZ")
-        else:
-            assert isinstance(impedance, int)
-            self._write(f"C{channelNumber}:OUTP LOAD,{impedance}")
+        if impedance != 50:
+            raise ValueError(
+                f"{self.instrumentName} only supports 50R load impedance"
+            )
 
     def get_channel_load_impedance(self, channelNumber: int) -> float:
-        response = self._query(f"C{channelNumber}:OUTP?")
-        impedance = response.split(",")[2]
-        if impedance == "HZ":
-            return float("inf")
-        else:
-            return float(impedance)
+        return 50
