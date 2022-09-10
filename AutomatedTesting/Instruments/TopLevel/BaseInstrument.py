@@ -229,6 +229,7 @@ class BaseInstrument:
         Raises:
             None
         """
+        return []
         errorList = []
         errors = self._query("SYST:ERR?")
         errorStrings = errors.split('",')

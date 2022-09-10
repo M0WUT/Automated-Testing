@@ -15,7 +15,9 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
     hiddenColumns: List[int]
     headersRow: int
 
-    def initialise(self, name, dutName: Optional[str] = None, testNotes: Optional[str] = None):
+    def initialise(
+        self, name, dutName: Optional[str] = None, testNotes: Optional[str] = None
+    ):
         self.currentColumn = 0
         self.currentRow = 0
         self.maxColumn = 0

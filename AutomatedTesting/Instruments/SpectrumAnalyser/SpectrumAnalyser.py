@@ -67,6 +67,7 @@ class SpectrumAnalyser(BaseInstrument):
         self.set_input_attenuator(10)
         if self.hasPreamp:
             self.disable_preamp()
+        self.disable_averaging()
         self._write(":INIT:CONT 1")
         super().cleanup()
 

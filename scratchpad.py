@@ -21,10 +21,18 @@ TIMEOUT = 1
 
 
 with TestSupervisor(
+    loggingLevel=logging.DEBUG, instruments=[e4407b], saveResults=False
+):
+    while True:
+        print(e4407b._query("SYST:ERR?"))
+        sleep(1)
+
+
+with TestSupervisor(
     loggingLevel=logging.DEBUG,
-    instruments=[e4407b, noiseSource, tenmaSingleChannel],
+    instruments=[dsa815tg, noiseSource, tenmaSingleChannel],
     saveResults=False,
 ):
     psu = tenmaSingleChannel.reserve_channel(1, "Power Supply")
 
-    run_noise_figure_test(200e6, 1300e6, e4407b, psu, noiseSource, 601)
+    run_noise_figure_test(300e6, 500e6, dsa815tg, psu, noiseSource, 601)

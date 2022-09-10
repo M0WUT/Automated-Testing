@@ -20,13 +20,13 @@ def readable_freq(freq):
     Raises:
         None
     """
-    if(freq >= 1e9):
+    if freq >= 1e9:
         divider = 1e9
         units = "GHz"
-    elif(freq >= 1e6):
+    elif freq >= 1e6:
         divider = 1e6
         units = "MHz"
-    elif(freq >= 1e3):
+    elif freq >= 1e3:
         divider = 1e3
         units = "kHz"
     else:
@@ -37,13 +37,13 @@ def readable_freq(freq):
 
     # See if we can trim annoying ".0" that
     # Python puts on integer floats
-    if x[-2:] == '.0':
+    if x[-2:] == ".0":
         x = x[:-2]
     return x + units
 
 
 @dataclass
-class StraightLine():
+class StraightLine:
     gradient: float
     intercept: float
 
@@ -53,7 +53,7 @@ class StraightLine():
 
 
 def intercept_point(a: StraightLine, b: StraightLine) -> Tuple[float, float]:
-    """ Takes two straight lines and returns the x and y coordinates that that intercept"""
+    """Takes two straight lines and returns the x and y coordinates that that intercept"""
     assert a.gradient != b.gradient, "Two parallel lines will never intercept"
     x = (b.intercept - a.intercept) / (a.gradient - b.gradient)
     y = a.evaluate(x)
@@ -65,7 +65,7 @@ def best_fit_line_with_known_gradient(
     xValues: List[float],
     yValues: List[float],
     expectedGradient: float = 3,
-    maxErrorPercentage: float = 2
+    maxErrorPercentage: float = 2,
 ) -> StraightLine:
     """
     Takes a list of y and x values, attempts to find line by removing data
@@ -93,19 +93,14 @@ def best_fit_line_with_known_gradient(
 
     while len(x) >= 4:
         # Best fit line
-        gradient, intercept = numpy.polyfit(
-            numpy.array(x),
-            numpy.array(y),
-            1
-        )
+        gradient, intercept = numpy.polyfit(numpy.array(x), numpy.array(y), 1)
         if (
-            (1 - maxErrorPercentage / 100) * expectedGradient <= gradient and
-            gradient <= (1 + maxErrorPercentage / 100) * expectedGradient
-        ):
+            1 - maxErrorPercentage / 100
+        ) * expectedGradient <= gradient and gradient <= (
+            1 + maxErrorPercentage / 100
+        ) * expectedGradient:
             # We've found a solution
-            return StraightLine(
-                round(gradient, 4), round(intercept, 4)
-            )
+            return StraightLine(round(gradient, 4), round(intercept, 4))
 
         # Check whether the top pair or the bottom pair of datapoints
         # have a gradient furthest from the target and discard them
@@ -121,5 +116,7 @@ def best_fit_line_with_known_gradient(
             y = y[:-1]
 
     return None
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     print(readable_freq(50e6))

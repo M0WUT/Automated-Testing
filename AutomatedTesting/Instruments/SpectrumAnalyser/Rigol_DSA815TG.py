@@ -1,9 +1,7 @@
 import logging
 
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    DetectorMode,
-    SpectrumAnalyser,
-)
+    DetectorMode, SpectrumAnalyser)
 from AutomatedTesting.Instruments.TopLevel.BaseInstrument import BaseInstrument
 
 
@@ -64,3 +62,10 @@ class Rigol_DSA815TG(SpectrumAnalyser):
         assert len(data) == 601
         data[0] = data[0].split(" ")[1]
         return [float(x) for x in data]
+
+    def enable_averaging(self, numAverages: int = 10) -> None:
+        self._write(f":TRAC:AVER:COUN {numAverages}")
+        self._write(":TRAC:MODE POW")
+
+    def disable_averaging(self) -> None:
+        self._write(":TRAC:MODE WRIT")

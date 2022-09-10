@@ -27,8 +27,9 @@ def run_noise_figure_test(
     numFreqPoints: int = 401,
     calRefLevel: int = -90,
     caldBPerDiv: int = 5,
-    dutRefLevel: int = -60,
+    dutRefLevel: int = -80,
     dutdBPerDiv: int = 5,
+    numAverages: int = 10,
     t0=290,
     resultsDirectory: str = "/mnt/Transit",
     pickleFile: Optional[str] = None,
@@ -46,18 +47,17 @@ def run_noise_figure_test(
         spectrumAnalyser.set_stop_freq(maxFreq)
         spectrumAnalyser.set_sweep_points(numFreqPoints)
         spectrumAnalyser.set_detector_mode(DetectorMode.RMS)
-        spectrumAnalyser.set_rbw(10e3)
+        spectrumAnalyser.set_rbw(30e3)
         spectrumAnalyser.set_vbw_rbw_ratio(0.1)
-        if spectrumAnalyser.read_sweep_time() < 10000:
-            spectrumAnalyser.set_sweep_time(10000)
+        if spectrumAnalyser.read_sweep_time() < 5000:
+            spectrumAnalyser.set_sweep_time(5000)
         sleep(3)
         spectrumAnalyser.set_ref_level(0)
         spectrumAnalyser.set_ampl_scale(5)
         spectrumAnalyser.set_input_attenuator(0)
         if spectrumAnalyser.hasPreamp:
             spectrumAnalyser.enable_preamp()
-        # spectrumAnalyser.set_num_averages(10)
-        # spectrumAnalyser.enable_averaging()
+        spectrumAnalyser.enable_averaging(numAverages)
 
         freqs = linspace(minFreq, maxFreq, numFreqPoints)
 
@@ -69,9 +69,19 @@ def run_noise_figure_test(
         # Measure noise of spectrum analyser
         spectrumAnalyser.set_ref_level(calRefLevel)
         spectrumAnalyser.set_ampl_scale(caldBPerDiv)
+        spectrumAnalyser.disable_averaging()
+        spectrumAnalyser.enable_averaging(numAverages)
+        for i in range(numAverages - 1):
+            logging.debug(i)
+            spectrumAnalyser.trigger_measurement()
         saOffList = spectrumAnalyser.get_trace_data()
         psu.enable_output()
         sleep(2)
+        spectrumAnalyser.disable_averaging()
+        spectrumAnalyser.enable_averaging(numAverages)
+        for i in range(numAverages - 1):
+            logging.debug(i)
+            spectrumAnalyser.trigger_measurement()
         saOnList = spectrumAnalyser.get_trace_data()
         psu.disable_output()
         sleep(2)
@@ -84,9 +94,19 @@ def run_noise_figure_test(
         )
 
         # Measure combined noise of spectrum analyser + DUT
+        spectrumAnalyser.disable_averaging()
+        spectrumAnalyser.enable_averaging(numAverages)
+        for i in range(numAverages - 1):
+            logging.debug(i)
+            spectrumAnalyser.trigger_measurement()
         combinedOffList = spectrumAnalyser.get_trace_data()
         psu.enable_output()
         sleep(2)
+        spectrumAnalyser.disable_averaging()
+        spectrumAnalyser.enable_averaging(numAverages)
+        for i in range(numAverages - 1):
+            logging.debug(i)
+            spectrumAnalyser.trigger_measurement()
         combinedOnList = spectrumAnalyser.get_trace_data()
         psu.disable_output()
         sleep(2)
