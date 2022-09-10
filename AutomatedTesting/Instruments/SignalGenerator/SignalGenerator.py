@@ -2,6 +2,7 @@ import logging
 from enum import Enum, auto
 from typing import Tuple
 
+from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.MultichannelInstrument import (
     InstrumentChannel,
     MultichannelInstrument,
@@ -20,13 +21,14 @@ class SignalGeneratorChannel(InstrumentChannel):
     def __init__(
         self,
         channelNumber: int,
-        logger: logging.logger,
+        instrument: BaseInstrument,
+        logger: logging.Logger,
         maxPower: float,  # in dBm
         minPower: float,
         maxFreq: float,  # in Hz
         minFreq: float,
     ):
-        super().__init__(channelNumber, logger)
+        super().__init__(channelNumber, instrument, logger)
 
         # Save channel limits for power - Two limits as we
         # can set soft limits later
@@ -39,12 +41,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         if minFreq > maxFreq:
             raise ValueError
         self.absoluteMaxFreq = self.maxFreq = maxFreq
-        self.abosoluteMinFreq = self.minFreq = minFreq
-
-        self.set_freq(self.minFreq)
-        self.set_power(self.minPower)
-        self.set_load_impedance(50)
-        self.set_modulation(SignalGeneratorModulation.NONE)
+        self.absoluteMinFreq = self.minFreq = minFreq
 
     def set_soft_power_limits(self, minPower, maxPower):
         """
@@ -122,7 +119,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         if (power < self.minPower) or (power > self.maxPower):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")
         self.instrument.set_channel_power(self.channelNumber, power)
-        if self.verify:
+        if self.instrument.verify:
             assert self.get_power() == power
         self.logger.debug(f"{self.name} set to {power} dBm")
 
@@ -154,8 +151,6 @@ class SignalGeneratorChannel(InstrumentChannel):
         """
         if self.minFreq <= freq <= self.maxFreq:
             self.instrument.set_channel_freq(self.channelNumber, freq)
-            if self.verify:
-                assert self.get_freq() == freq
             self.logger.debug(f"{self.name} set to {readable_freq(freq)}")
 
     def get_freq(self) -> float:
@@ -183,7 +178,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             AssertionError: If verified modulation != requested modulation
         """
         self.instrument.set_channel_modulation(self.channelNumber, modulation)
-        if self.verify:
+        if self.instrument.verify:
             assert self.get_modulation() == modulation
         self.logger.debug(f"{self.name} set modulation type to {modulation}")
 
@@ -215,7 +210,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         self.instrument.set_channel_load_impedance(
             self.channelNumber, impedance
         )
-        if self.verify:
+        if self.instrument.verify:
             assert self.get_load_impedance() == impedance
 
     def get_load_impedance(self) -> float:
@@ -238,6 +233,15 @@ class SignalGenerator(MultichannelInstrument):
     This should never be implemented directly
     """
 
+    def __enter__(self):
+        super().__enter__()
+        for x in self.channels:
+            x.set_load_impedance(50)
+            x.set_modulation(SignalGeneratorModulation.NONE)
+            x.set_freq(x.minFreq)
+            x.set_power(x.minPower)
+        return self
+
     def get_channel_errors(self, channelNumber: int) -> list[Tuple[int, str]]:
         raise NotImplementedError  # pragma: no cover
 
@@ -247,7 +251,7 @@ class SignalGenerator(MultichannelInstrument):
     def get_channel_power(self, channelNumber: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_freq(self, channelNumber: int, freq: float):
+    def set_channel_frequency(self, channelNumber: int, freq: float):
         raise NotImplementedError  # pragma: no cover
 
     def get_channel_freq(self, channelNumber: int) -> float:

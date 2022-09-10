@@ -15,6 +15,7 @@ class Siglent_SDG2122X(SignalGenerator):
     """
 
     def __init__(
+        self,
         resourceManager: ResourceManager,
         visaAddress: str,
         instrumentName: str,
@@ -25,16 +26,20 @@ class Siglent_SDG2122X(SignalGenerator):
     ):
         channel1 = SignalGeneratorChannel(
             channelNumber=1,
+            instrument=self,
+            logger=logger,
             maxPower=30,
-            minPower=-60,
+            minPower=-50,
             maxFreq=120e6,
             minFreq=1e-6,
         )
 
         channel2 = SignalGeneratorChannel(
             channelNumber=2,
+            instrument=self,
+            logger=logger,
             maxPower=30,
-            minPower=-60,
+            minPower=-50,
             maxFreq=120e6,
             minFreq=1e-6,
         )
@@ -73,7 +78,6 @@ class Siglent_SDG2122X(SignalGenerator):
         return float(channelStatus.split("AMPDBM,")[1].split("d")[0])
 
     def set_channel_freq(self, channelNumber: int, freq: float):
-        assert round(freq) == freq, "Frequency must be integer number of Hz"
         self._write(f"C{channelNumber}:BSWV FRQ,{int(freq)}")
 
     def get_channel_freq(self, channelNumber: int) -> float:
@@ -93,7 +97,7 @@ class Siglent_SDG2122X(SignalGenerator):
         self, channelNumber: int
     ) -> SignalGeneratorModulation:
         channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        modulation = float(channelStatus.split(",")[1])
+        modulation = channelStatus.split(",")[1]
         if modulation == "SINE":
             return SignalGeneratorModulation.NONE
         else:
@@ -104,11 +108,11 @@ class Siglent_SDG2122X(SignalGenerator):
             self._write(f"C{channelNumber}:OUTP LOAD,HZ")
         else:
             assert isinstance(impedance, int)
-            self._write(f"C1:OUTP LOAD,{impedance}")
+            self._write(f"C{channelNumber}:OUTP LOAD,{impedance}")
 
     def get_channel_load_impedance(self, channelNumber: int) -> float:
         response = self._query(f"C{channelNumber}:OUTP?")
-        impedance = response.split("OUTP ")[1].split(",")[1]
+        impedance = response.split(",")[2]
         if impedance == "HZ":
             return float("inf")
         else:

@@ -1,38 +1,5 @@
-import logging
-from time import sleep
+from AutomatedTesting.Instruments.InstrumentConfig import sdg2122x
 
-import serial
-
-from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import SignalGenerator
-from AutomatedTesting.Instruments.TopLevel.config import (
-    dsa815tg,
-    e4407b,
-    noiseSource,
-    sdg2122x,
-    tenmaSingleChannel,
-)
-from AutomatedTesting.ProperTests.IMD import run_imd_test
-from AutomatedTesting.ProperTests.NoiseFigure import run_noise_figure_test
-from AutomatedTesting.PytestDefinitions.TestSupervisor import TestSupervisor
-
-PORT = "/dev/ttyACM0"
-BAUDRATE = 9600
-TIMEOUT = 1
-
-
-with TestSupervisor(
-    loggingLevel=logging.DEBUG, instruments=[e4407b], saveResults=False
-):
-    while True:
-        print(e4407b._query("SYST:ERR?"))
-        sleep(1)
-
-
-with TestSupervisor(
-    loggingLevel=logging.DEBUG,
-    instruments=[dsa815tg, noiseSource, tenmaSingleChannel],
-    saveResults=False,
-):
-    psu = tenmaSingleChannel.reserve_channel(1, "Power Supply")
-
-    run_noise_figure_test(300e6, 500e6, dsa815tg, psu, noiseSource, 601)
+with sdg2122x as siggen:
+    test = siggen.reserve_channel(1, "test")
+    test.set_freq(2e6)

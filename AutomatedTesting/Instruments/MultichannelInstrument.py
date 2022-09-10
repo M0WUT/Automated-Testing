@@ -9,20 +9,25 @@ from pyvisa import ResourceManager
 
 
 class InstrumentChannel:
-    def __init__(self, channelNumber: int, logger: logging.logger):
+    def __init__(
+        self,
+        channelNumber: int,
+        instrument: BaseInstrument,
+        logger: logging.Logger,
+    ):
         """
         Channel Number is 1-indexed because I'm human
         """
         # Channel objects get created before the instrument
         # they're assigned to so have to set as None and override later
-        self.instrument = None
+        self.instrument = instrument
+        self.name = None
         self.channelNumber = channelNumber
         self.logger = logger
 
         self.reserved = False
-        self.name = (
-            f"{self.instrument.instrumentName} - Channel {self.channelNumber}"
-        )
+
+        self.name = None
         self.monitorProcess = Process(
             target=self.check_channel_errors, args=[os.getpid()], daemon=True
         )
@@ -73,14 +78,13 @@ class InstrumentChannel:
             self.monitorProcess.start()
             self.logger.debug(f"{self.name} - Output Enabled")
         else:
-            assert self.monitorProcess.is_alive and self.reserved
-            # Stop the monitoring process
-            self.monitorProcess.terminate()
-            self.monitorProcess.join(2)
+            if self.monitorProcess.is_alive():
+                self.monitorProcess.terminate()
+                self.monitorProcess.join(2)
             self.instrument.disable_channel_output(self.channelNumber)
             self.logger.debug(f"{self.name} - Output Disabled")
 
-        if self.verify:
+        if self.instrument.verify:
             assert self.get_output_state() == enabled
 
     def get_output_state(self) -> bool:
@@ -116,17 +120,6 @@ class MultichannelInstrument(BaseInstrument):
         logger: logging.Logger,
         **kwargs,
     ):
-        assert len(channels) == channelCount
-        expectedChannels = list(range(1, channelCount + 1))
-        foundChannels = [x.channelNumber for x in channels]
-        assert expectedChannels == foundChannels
-
-        self.channels = channels
-        for x in self.channels:
-            x.instrument = self
-            x.disable_output()
-
-        self.channelCount = channelCount
         super().__init__(
             resourceManager,
             visaAddress,
@@ -135,6 +128,22 @@ class MultichannelInstrument(BaseInstrument):
             verify,
             logger,
         )
+
+        assert len(channels) == channelCount
+        expectedChannels = list(range(1, channelCount + 1))
+        foundChannels = [x.channelNumber for x in channels]
+        assert expectedChannels == foundChannels
+
+        self.channels = channels
+        self.channelCount = channelCount
+
+    def __enter__(self):
+        super().__enter__()
+        for x in self.channels:
+            x.instrument = self
+            x.name = f"{self.instrumentName} - Channel {x.channelNumber}"
+            self.disable_channel_output(x.channelNumber)
+        return self
 
     def __exit__(self, *args, **kwargs):
         for x in self.channels:
@@ -156,6 +165,6 @@ class MultichannelInstrument(BaseInstrument):
     def reserve_channel(
         self, channelNumber: int, purpose: str
     ) -> InstrumentChannel:
-        self.validate_channel_number(channelNumber, purpose)
-        self.channels[channelNumber - 1]._reserve()
+        self.validate_channel_number(channelNumber)
+        self.channels[channelNumber - 1]._reserve(purpose)
         return self.channels[channelNumber - 1]
