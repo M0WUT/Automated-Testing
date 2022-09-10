@@ -1,5 +1,6 @@
 import logging
-from time import sleep
+import signal
+from typing import Dict
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from pyvisa import ResourceManager
@@ -23,16 +24,38 @@ logger.addHandler(loggingConsoleHandler)
 # logger.addHandler(loggingFileHandler)
 
 
-if __name__ == "__main__":
-    testInstrument = BaseInstrument(
-        resourceManager,
-        visaAddress="TCPIP::10.59.73.11::INSTR",
-        instrumentName="SDG2122X",
-        expectedIdnResponse="Siglent Technologies,SDG2122X,SDG2XCAX5R0800,2.01.01.35R3B2",
-        verify=False,
-        logger=logger,
-    )
+testInstrument = BaseInstrument(
+    resourceManager,
+    visaAddress="TCPIP::10.59.73.11::INSTR",
+    instrumentName="SDG2122X",
+    expectedIdnResponse="Siglent Technologies,SDG2122X,SDG2XCAX5R0800,2.01.01.35R3B2",
+    verify=False,
+    logger=logger,
+)
 
-    while True:
-        print(testInstrument.test_connection())
-        sleep(2)
+
+instrumentList = [testInstrument]
+
+
+def check_online_instruments() -> Dict[str:bool]:
+    statusDict = {}
+    for instrument in instrumentList:
+        statusDict[instrument.instrumentName] = instrument.test_connection()
+
+    return statusDict
+
+
+# Attach handler to signal thrown by any error monitoring thread
+def panic():
+    raise Exception()
+
+
+signal.signal(signal.SIGUSR1, panic)
+
+
+def main():
+    print(check_online_instruments())
+
+
+if __name__ == "__main__":
+    main()

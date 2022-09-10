@@ -19,10 +19,11 @@ class BaseInstrument:
     performed once opened with a context manager ("with x as y:")
 
     When opened with a context manager, this will start communication with the
-    instrument, confirm that the instrument responds correctly and begin checking
-    the instrument for errors periodically
+    instrument, confirm that the instrument responds correctly and begin
+    checking the instrument for errors periodically
 
-    Closing the connection is handled within the context manager's __exit__ function
+    Closing the connection is handled within the context manager's
+    __exit__ function
 
     """
 
@@ -45,9 +46,6 @@ class BaseInstrument:
         self.kwargs = kwargs
 
         self.dev = None  # Connection to the device
-        self.reserved = False  # Whether this instrument is in use
-        # When reserved, this will contain the purpose of the instrument
-        self.displayName = None
         self.lock = Lock()  # lock for access to the device connection
 
     def __enter__(self):
@@ -66,12 +64,12 @@ class BaseInstrument:
         )
         self.errorProcess.start()
 
-        # Catches signal from child thread indicating an error
-        signal.signal(signal.SIGUSR1, self.panic)
+        # Lock front panel control of the instrument
+        self.set_remote_control()
         self.logger.info(f"{self.instrumentName} initialised")
 
     def __exit__(self, *args, **kwargs):
-        self.free()
+        self.set_local_control()
         if self.errorProcess:
             self.errorProcess.terminate()
         if self.dev:
@@ -103,6 +101,10 @@ class BaseInstrument:
         )
 
     def test_connection(self) -> bool:
+        """
+        Tests whether the instruments can be connected to.
+        Return True if this is possible
+        """
         try:
             self.open_connection()
             return True
@@ -110,10 +112,22 @@ class BaseInstrument:
             return False
         finally:
             if self.dev:
+                # Just in case the instrument automatically goes to remote
+                self.set_local_control()
                 self.dev.close()
 
-    def panic(self, *args, **kwargs):
-        raise Exception(f"{self.instrumentName} reported errors")
+    def set_remote_control(self):
+        """
+        Used if the instrument has any specific commands for remote control
+        e.g. locking the front panel or blanking the display
+        """
+        pass
+
+    def set_local_control(self):
+        """
+        Returns the instrument back to local control
+        """
+        pass
 
     def check_instrument_errors(self, pid: int):
         """
@@ -130,8 +144,8 @@ class BaseInstrument:
             if errorList:
                 for errorCode, errorMessage in errorList:
                     self.logger.error(
-                        f"{self.dispalyName} reporting error {errorCode} ({errorMessage}). "
-                        f"Shutting down..."
+                        f"{self.instrumentName} reporting error "
+                        f"{errorCode} ({errorMessage}). Shutting down..."
                     )
 
                 # Inform main thread
@@ -167,27 +181,6 @@ class BaseInstrument:
         """
         self._write("*RST")
         self._write("*CLS")
-
-    def reserve(self, purpose: str):
-        """
-        Allows a test to take exclusive control of an instrument
-        This prevents the same instrument accidentially being assigned
-        multiple roles
-        """
-        assert self.reserved is False, "Attempted to reserve a reserved device"
-        self.displayName = purpose
-        self.reserved = True
-        self.logger.info(
-            f"{self.instrumentName} reserved as {self.displayName}"
-        )
-
-    def free(self):
-        assert self.reserved
-        self.logger.debug(
-            f"{self.instrumentName} freed from role as {self.displayName}"
-        )
-        self.displayName = None
-        self.reserved = False
 
     def _write(self, x: str, acquireLock: bool = True):
         """
