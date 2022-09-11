@@ -85,7 +85,7 @@ class BaseInstrument:
             self.dev = self.resourceManager.open_resource(
                 self.visaAddress, **self.kwargs
             )
-        except VisaIOError:
+        except (VisaIOError, ValueError):
             raise InstrumentConnectionError(
                 f'Connection to "{self.instrumentName}" at VISA address '
                 f'"{self.visaAddress}" failed.\r\nAvailable VISA address:'

@@ -1,8 +1,15 @@
 import logging
 import signal
+import time
 from typing import Dict
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import (
+    Agilent_U2001A,
+)
+from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import (
+    Agilent_E4433B,
+)
 from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
     Siglent_SDG2122X,
 )
@@ -35,8 +42,25 @@ sdg2122x = Siglent_SDG2122X(
     logger=logger,
 )
 
+u2001a = Agilent_U2001A(
+    resourceManager=resourceManager,
+    visaAddress="USB0::2391::11032::MY53150007::0::INSTR",
+    instrumentName="Agilent U2001A",
+    expectedIdnResponse="Agilent Technologies,U2001A,MY53150007,A1.03.05",
+    verify=True,
+    logger=logger,
+)
 
-instrumentList = [sdg2122x]
+e4433b = Agilent_E4433B(
+    resourceManager=resourceManager,
+    visaAddress="USB0::1003::8293::GPIB_19_95936323834351215181::0::INSTR",
+    instrumentName="Agilent E4433B",
+    expectedIdnResponse="Hewlett-Packard, ESG-D4000B, GB38320196, B.03.86",
+    verify=True,
+    logger=logger,
+)
+
+instrumentList = [sdg2122x, u2001a, e4433b]
 
 
 def check_online_instruments() -> Dict[str, bool]:
@@ -53,3 +77,7 @@ def panic():
 
 
 signal.signal(signal.SIGUSR1, panic)
+
+while True:
+    print(check_online_instruments())
+    time.sleep(2)

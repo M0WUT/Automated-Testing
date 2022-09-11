@@ -1,4 +1,7 @@
+from logging import Logger
+
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+from pyvisa import ResourceManager
 
 
 class EntireInstrument(BaseInstrument):
@@ -11,15 +14,30 @@ class EntireInstrument(BaseInstrument):
     Multimeters, Noise Sources etc that cannot be treated as multiple parts
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        resourceManager: ResourceManager,
+        visaAddress: str,
+        instrumentName: str,
+        expectedIdnResponse: str,
+        verify: bool,
+        logger: Logger,
+        **kwargs,
+    ):
+        super().__init__(
+            resourceManager=resourceManager,
+            visaAddress=visaAddress,
+            instrumentName=instrumentName,
+            expectedIdnResponse=expectedIdnResponse,
+            verify=verify,
+            logger=logger,
+            **kwargs,
+        )
         self.reserved = False  # Whether this instrument is in use
-        # When reserved, this will contain the purpose of the instrument
-        self.displayName = None
+        self.name = self.instrumentName
 
-        self.reserved = False  # Whether this instrument is in use
-        # When reserved, this will contain the purpose of the instrument
-        self.displayName = None
+        # Used to remember previous freq to avoid continually updating it
+        self.centreFreq = 0
 
     def reserve(self, purpose: str):
         """
@@ -28,7 +46,7 @@ class EntireInstrument(BaseInstrument):
         multiple roles
         """
         assert self.reserved is False, "Attempted to reserve a reserved device"
-        self.displayName = purpose
+        self.name = purpose
         self.reserved = True
         self.logger.info(
             f"{self.instrumentName} reserved as {self.displayName}"
@@ -39,5 +57,5 @@ class EntireInstrument(BaseInstrument):
         self.logger.debug(
             f"{self.instrumentName} freed from role as {self.displayName}"
         )
-        self.displayName = None
+        self.name = self.instrumentName
         self.reserved = False

@@ -121,12 +121,13 @@ class MultichannelInstrument(BaseInstrument):
         **kwargs,
     ):
         super().__init__(
-            resourceManager,
-            visaAddress,
-            instrumentName,
-            expectedIdnResponse,
-            verify,
-            logger,
+            resourceManager=resourceManager,
+            visaAddress=visaAddress,
+            instrumentName=instrumentName,
+            expectedIdnResponse=expectedIdnResponse,
+            verify=verify,
+            logger=logger,
+            **kwargs,
         )
 
         assert len(channels) == channelCount

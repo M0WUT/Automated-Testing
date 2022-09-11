@@ -1,12 +1,10 @@
 import logging
 from enum import Enum, auto
-from typing import Tuple
+from typing import List, Tuple
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.MultichannelInstrument import (
-    InstrumentChannel,
-    MultichannelInstrument,
-)
+    InstrumentChannel, MultichannelInstrument)
 from AutomatedTesting.UsefulFunctions import readable_freq
 
 
@@ -231,6 +229,8 @@ class SignalGenerator(MultichannelInstrument):
     """
     Pure virtual class for Signal Generators
     This should never be implemented directly
+    The functions listed below should all be overwritten by the child
+    class with the possible exception of enter and get_instrument_errors
     """
 
     def __enter__(self):
@@ -242,7 +242,16 @@ class SignalGenerator(MultichannelInstrument):
             x.set_power(x.minPower)
         return self
 
+    def get_instrument_errors(self) -> List[Tuple[int, str]]:
+        return super().get_instrument_errors()
+
     def get_channel_errors(self, channelNumber: int) -> list[Tuple[int, str]]:
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_output_state(self, channelNumber: int, enabled: bool):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_channel_output_state(self, channelNumber: int) -> bool:
         raise NotImplementedError  # pragma: no cover
 
     def set_channel_power(self, channelNumber: int, power: float):
