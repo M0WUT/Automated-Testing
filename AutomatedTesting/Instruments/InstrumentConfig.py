@@ -58,6 +58,7 @@ e4433b = Agilent_E4433B(
     expectedIdnResponse="Hewlett-Packard, ESG-D4000B, GB38320196, B.03.86",
     verify=True,
     logger=logger,
+    timeout=5000,
 )
 
 instrumentList = [sdg2122x, u2001a, e4433b]
@@ -78,6 +79,12 @@ def panic():
 
 signal.signal(signal.SIGUSR1, panic)
 
-while True:
-    print(check_online_instruments())
-    time.sleep(2)
+
+def main():
+    while True:
+        print(check_online_instruments())
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    main()

@@ -180,6 +180,9 @@ class BaseInstrument:
         Resets the device and clears all errors
         """
         self._write("*RST")
+        # Wait for reset to complete
+        while self._query("*OPC?") == "0":
+            pass
         self._write("*CLS")
 
     def _write(self, x: str, acquireLock: bool = True):
@@ -198,6 +201,7 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)
+        # self.logger.debug(x)  # @DEBUG
 
     def _read(self, acquireLock: bool = True) -> str:
         """

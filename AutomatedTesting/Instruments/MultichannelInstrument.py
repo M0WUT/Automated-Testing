@@ -143,7 +143,7 @@ class MultichannelInstrument(BaseInstrument):
         for x in self.channels:
             x.instrument = self
             x.name = f"{self.instrumentName} - Channel {x.channelNumber}"
-            self.disable_channel_output(x.channelNumber)
+            x.disable_output()
         return self
 
     def __exit__(self, *args, **kwargs):

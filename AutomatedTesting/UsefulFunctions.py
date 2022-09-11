@@ -26,7 +26,9 @@ def readable_freq(freq: float) -> str:
 
     # See if we can trim annoying ".0" that
     # Python puts on integer floats
-    return x.strip(".0") + units
+    if x[-2:] == ".0":
+        x = x[:-2]
+    return x + units
 
 
 @dataclass
@@ -106,4 +108,4 @@ def best_fit_line_with_known_gradient(
 
 
 if __name__ == "__main__":
-    print(readable_freq(50e6))
+    print(readable_freq(250e3))

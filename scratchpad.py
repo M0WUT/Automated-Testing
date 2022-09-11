@@ -1,6 +1,6 @@
-from pyvisa import ResourceManager
+from time import sleep
 
-rm = ResourceManager("@py")
+from AutomatedTesting.Instruments.InstrumentConfig import e4433b, u2001a
 
-my_instrument = rm.open_resource("USB0::1003::8293::GPIB_19_95936323834351215181::0::INSTR")
-print(my_instrument.query("*IDN?"))
+with e4433b as sigGen:
+    sleep(10)

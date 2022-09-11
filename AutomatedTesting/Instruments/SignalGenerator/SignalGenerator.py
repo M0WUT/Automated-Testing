@@ -118,7 +118,8 @@ class SignalGeneratorChannel(InstrumentChannel):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")
         self.instrument.set_channel_power(self.channelNumber, power)
         if self.instrument.verify:
-            assert self.get_power() == power
+            readbackPower = self.get_power()
+            assert readbackPower == power
         self.logger.debug(f"{self.name} set to {power} dBm")
 
     def get_power(self) -> float:
@@ -149,6 +150,9 @@ class SignalGeneratorChannel(InstrumentChannel):
         """
         if self.minFreq <= freq <= self.maxFreq:
             self.instrument.set_channel_freq(self.channelNumber, freq)
+            if self.instrument.verify:
+                readbackFreq = self.get_freq()
+                assert readbackFreq == freq
             self.logger.debug(f"{self.name} set to {readable_freq(freq)}")
 
     def get_freq(self) -> float:
@@ -232,6 +236,11 @@ class SignalGenerator(MultichannelInstrument):
     The functions listed below should all be overwritten by the child
     class with the possible exception of enter and get_instrument_errors
     """
+
+    def reserve_channel(
+        self, channelNumber: int, purpose: str
+    ) -> SignalGeneratorChannel:
+        return super().reserve_channel(channelNumber, purpose)
 
     def __enter__(self):
         super().__enter__()

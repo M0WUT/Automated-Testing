@@ -37,6 +37,7 @@ class PowerMeter(EntireInstrument):
         self.maxFreq = maxFreq
 
     def __enter__(self):
+        super().__enter__()
         self.internal_zero()
         return self
 
