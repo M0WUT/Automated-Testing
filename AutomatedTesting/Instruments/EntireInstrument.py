@@ -48,14 +48,12 @@ class EntireInstrument(BaseInstrument):
         assert self.reserved is False, "Attempted to reserve a reserved device"
         self.name = purpose
         self.reserved = True
-        self.logger.info(
-            f"{self.instrumentName} reserved as {self.displayName}"
-        )
+        self.logger.info(f"{self.instrumentName} reserved as {self.name}")
 
     def free(self):
         assert self.reserved
         self.logger.debug(
-            f"{self.instrumentName} freed from role as {self.displayName}"
+            f"{self.instrumentName} freed from role as {self.name}"
         )
         self.name = self.instrumentName
         self.reserved = False

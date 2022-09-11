@@ -201,7 +201,7 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)
-        # self.logger.debug(x)  # @DEBUG
+        self.logger.debug(x)  # @DEBUG
 
     def _read(self, acquireLock: bool = True) -> str:
         """

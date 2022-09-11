@@ -53,7 +53,7 @@ u2001a = Agilent_U2001A(
 
 e4433b = Agilent_E4433B(
     resourceManager=resourceManager,
-    visaAddress="USB0::1003::8293::GPIB_19_95936323834351215181::0::INSTR",
+    visaAddress="USB0::1003::8293::Hewlett-Packard__ESG-D4000B__GB38320196__B.03.86::0::INSTR",
     instrumentName="Agilent E4433B",
     expectedIdnResponse="Hewlett-Packard, ESG-D4000B, GB38320196, B.03.86",
     verify=True,
