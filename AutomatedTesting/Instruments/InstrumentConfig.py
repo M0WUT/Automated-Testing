@@ -1,5 +1,6 @@
 import logging
 import signal
+import sys
 import time
 from typing import Dict
 
@@ -73,8 +74,9 @@ def check_online_instruments() -> Dict[str, bool]:
 
 
 # Attach handler to signal thrown by any error monitoring thread
-def panic():
-    raise Exception()
+def panic(*args, **kwargs):
+    logger.error("Panicking, halting program")
+    sys.exit(1)
 
 
 signal.signal(signal.SIGUSR1, panic)
