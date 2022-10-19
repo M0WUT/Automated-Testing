@@ -13,3 +13,24 @@ Folder Structure:
 
 * Install module as editable (must be run from this folder)
 `pip3 install -e .`
+
+# Sidenote - Install of VNC for spectrum analyser viewing
+Add the following to 
+`sudo nano /lib/systemd/system/name-of-service.service`
+
+```
+[Unit]
+Description=Start VNC Viewer for Siglent Spectrum Analyser
+
+[Service]
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=vncviewer 10.59.73.133 -WarnUnencrypted=0 -Fullscreen -HideCloseAlert=1 -KeepAliveResponseTimeout=1 -KeepAliveInterval=10
+Restart=always
+RestartSec=10s
+KillMode=process
+TimeoutSec=infinity
+
+[Install]
+WantedBy=graphical.target
+```

@@ -10,3 +10,4 @@ linux-gpib/*
 *.p
 *.xlsx
 **/*.egg-info
+*.out

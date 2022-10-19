@@ -1,17 +1,41 @@
-import pickle
-from datetime import datetime
-from time import sleep
+import RPi.GPIO as GPIO
+import tkFont
+from Tkinter import *
 
-from xlsxwriter import Workbook
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(40, GPIO.OUT)
+GPIO.output(40, GPIO.LOW)
 
-from AutomatedTesting.ExcelHandler import ExcelWorksheetWrapper
-from AutomatedTesting.Instruments.InstrumentConfig import e4433b, u2001a
-from AutomatedTesting.UsefulFunctions import readable_freq
+win = Tk()
 
-with e4433b as sigGen:
-    dut = e4433b.reserve_channel(1, "main")
-    while True:
-        print(
-            f"{readable_freq(dut.get_freq())}, {dut.get_power()}, {dut.get_output_state()}"
-        )
-        sleep(2)
+myFont = tkFont.Font(family='Helvetica', size=36, weight='bold')
+
+
+def ledON():
+    print("LED button pressed")
+    if GPIO.input(40):
+        GPIO.output(40, GPIO.LOW)
+        ledButton["text"] = "LED ON"
+    else:
+        GPIO.output(40, GPIO.HIGH)
+        ledButton["text"] = "LED OFF"
+
+
+def exitProgram():
+    print("Exit Button pressed")
+    GPIO.cleanup()
+    win.quit()
+
+
+win.title("First GUI")
+win.geometry('800x480')
+
+exitButton = Button(win, text="Exit", font=myFont,
+                    command=exitProgram, height=2, width=6)
+exitButton.pack(side=BOTTOM)
+
+ledButton = Button(win, text="LED ON", font=myFont,
+                   command=ledON, height=2, width=8)
+ledButton.pack()
+
+mainloop()

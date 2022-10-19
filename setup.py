@@ -17,5 +17,7 @@ setup(
         "numpy",
         "pyusb",
         "GitPython",
+        "pep8-naming",
+        "flake8"
     ],
 )
