@@ -40,9 +40,7 @@ class Agilent_U2001A(PowerMeter):
         self.logger.info(f"{self.name} zeroed internally")
 
     def external_zero(self):
-        self.logger.debug(
-            f"{self.name}: Waiting for user intervention on zeroing"
-        )
+        self.logger.debug(f"{self.name}: Waiting for user intervention on zeroing")
         input(
             f"Please disconnect input from {self.name} and press "
             "any key to continue..."
@@ -50,12 +48,9 @@ class Agilent_U2001A(PowerMeter):
         self._write("CAL:ZERO:TYPE EXT")
         self._zero()
         self.logger.info(f"{self.name} zeroed externally")
-        self.logger.debug(
-            f"{self.name}: Waiting for user intervention on zeroing"
-        )
+        self.logger.debug(f"{self.name}: Waiting for user intervention on zeroing")
         input(
-            f"Please reconnect input to {self.name} and press "
-            "any key to continue..."
+            f"Please reconnect input to {self.name} and press " "any key to continue..."
         )
 
     def set_freq(self, freq):
@@ -88,6 +83,4 @@ class Agilent_U2001A(PowerMeter):
         self.dev.timeout = 0
         result = self._query("CAL?")
         self.dev.timeout = x
-        assert (
-            result != 0
-        ), f"Calibration of {self.name} failed. Return code: {result}"
+        assert result != 0, f"Calibration of {self.name} failed. Return code: {result}"

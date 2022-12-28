@@ -4,7 +4,9 @@ from typing import List, Tuple
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.MultichannelInstrument import (
-    InstrumentChannel, MultichannelInstrument)
+    InstrumentChannel,
+    MultichannelInstrument,
+)
 from AutomatedTesting.UsefulFunctions import readable_freq
 
 
@@ -55,9 +57,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             ValueError: If requested limits are outside
                 instrument limits
         """
-        if (maxPower > self.absoluteMaxPower) or (
-            minPower < self.absoluteMinPower
-        ):
+        if (maxPower > self.absoluteMaxPower) or (minPower < self.absoluteMinPower):
             self.logger.error(
                 f"{self.name}, "
                 f"requested power limits ({minPower}dBm - {maxPower}dBm) "
@@ -209,9 +209,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             AssertionError: If verified impedance != requested impedance
         """
-        self.instrument.set_channel_load_impedance(
-            self.channelNumber, impedance
-        )
+        self.instrument.set_channel_load_impedance(self.channelNumber, impedance)
         if self.instrument.verify:
             assert self.get_load_impedance() == impedance
 
@@ -280,9 +278,7 @@ class SignalGenerator(MultichannelInstrument):
     ):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_modulation(
-        self, channelNumber: int
-    ) -> SignalGeneratorModulation:
+    def get_channel_modulation(self, channelNumber: int) -> SignalGeneratorModulation:
         raise NotImplementedError  # pragma: no cover
 
     def set_channel_load_impedance(self, channelNumber: int, impedance: float):

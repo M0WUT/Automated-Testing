@@ -18,6 +18,6 @@ setup(
         "pyusb",
         "GitPython",
         "pep8-naming",
-        "flake8"
+        "flake8",
     ],
 )

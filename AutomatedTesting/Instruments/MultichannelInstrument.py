@@ -45,9 +45,7 @@ class InstrumentChannel:
     def free(self):
         assert self.reserved, "Attempeted to free an already free channel"
         oldName = self.name
-        self.name = (
-            f"{self.instrument.instrumentName} - Channel {self.channelNumber}"
-        )
+        self.name = f"{self.instrument.instrumentName} - Channel {self.channelNumber}"
         self.reserved = False
         self.logger.debug(f"{self.name} released from role as {oldName}")
 
@@ -163,9 +161,7 @@ class MultichannelInstrument(BaseInstrument):
     def validate_channel_number(self, number: int):
         assert number in list(range(1, self.channelCount + 1))
 
-    def reserve_channel(
-        self, channelNumber: int, purpose: str
-    ) -> InstrumentChannel:
+    def reserve_channel(self, channelNumber: int, purpose: str) -> InstrumentChannel:
         self.validate_channel_number(channelNumber)
         self.channels[channelNumber - 1]._reserve(purpose)
         return self.channels[channelNumber - 1]

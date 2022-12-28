@@ -91,9 +91,7 @@ class Agilent_E4433B(SignalGenerator):
         else:
             raise NotImplementedError
 
-    def get_channel_modulation(
-        self, channelNumber: int
-    ) -> SignalGeneratorModulation:
+    def get_channel_modulation(self, channelNumber: int) -> SignalGeneratorModulation:
         # Single channel instrument so ignore channelNumber
         response = self._query("OUTP:MOD:STAT?")
         if response == "0":
@@ -103,9 +101,7 @@ class Agilent_E4433B(SignalGenerator):
 
     def set_channel_load_impedance(self, channelNumber: int, impedance: float):
         if impedance != 50:
-            raise ValueError(
-                f"{self.instrumentName} only supports 50R load impedance"
-            )
+            raise ValueError(f"{self.instrumentName} only supports 50R load impedance")
 
     def get_channel_load_impedance(self, channelNumber: int) -> float:
         return 50

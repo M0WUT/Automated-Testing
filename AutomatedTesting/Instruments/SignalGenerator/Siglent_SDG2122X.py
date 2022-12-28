@@ -93,9 +93,7 @@ class Siglent_SDG2122X(SignalGenerator):
         else:
             raise NotImplementedError
 
-    def get_channel_modulation(
-        self, channelNumber: int
-    ) -> SignalGeneratorModulation:
+    def get_channel_modulation(self, channelNumber: int) -> SignalGeneratorModulation:
         channelStatus = self._query(f"C{channelNumber}:BSWV?")
         modulation = channelStatus.split(",")[1]
         if modulation == "SINE":

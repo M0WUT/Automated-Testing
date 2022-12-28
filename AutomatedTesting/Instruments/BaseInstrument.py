@@ -6,6 +6,7 @@ from time import sleep
 from typing import List, Tuple
 
 from pyvisa import ResourceManager, VisaIOError
+from serial import SerialException
 
 
 class InstrumentConnectionError(Exception):
@@ -85,7 +86,7 @@ class BaseInstrument:
             self.dev = self.resourceManager.open_resource(
                 self.visaAddress, **self.kwargs
             )
-        except (VisaIOError, ValueError):
+        except (VisaIOError, ValueError, SerialException):
             raise InstrumentConnectionError(
                 f'Connection to "{self.instrumentName}" at VISA address '
                 f'"{self.visaAddress}" failed.\r\nAvailable VISA address:'
@@ -108,7 +109,7 @@ class BaseInstrument:
         try:
             self.open_connection()
             return True
-        except InstrumentConnectionError:
+        except (InstrumentConnectionError, VisaIOError):
             return False
         finally:
             if self.dev:
@@ -135,9 +136,7 @@ class BaseInstrument:
         It queries the instrument then processes the results
         and decides whether to flag an issue to the main process
         """
-        self.logger.debug(
-            f"Started error monitoring thread for {self.instrumentName}"
-        )
+        self.logger.debug(f"Started error monitoring thread for {self.instrumentName}")
         while True:
             sleep(3)
             errorList = self.get_instrument_errors()

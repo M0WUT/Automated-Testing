@@ -52,8 +52,6 @@ class EntireInstrument(BaseInstrument):
 
     def free(self):
         assert self.reserved
-        self.logger.debug(
-            f"{self.instrumentName} freed from role as {self.name}"
-        )
+        self.logger.debug(f"{self.instrumentName} freed from role as {self.name}")
         self.name = self.instrumentName
         self.reserved = False
