@@ -15,6 +15,9 @@ Folder Structure:
 `pip3 install -e .`
 
 # Sidenote - Install of VNC for spectrum analyser viewing
+Install
+`sudo apt install realvnc-vnc-viewer`
+
 Add the following to 
 `sudo nano /lib/systemd/system/name-of-service.service`
 
