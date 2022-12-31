@@ -23,12 +23,12 @@ Add the following to
 
 ```
 [Unit]
-Description=Start VNC Viewer for Siglent Spectrum Analyser
+Description=Start VNC Viewer for Keysight MSOX2024A
 
 [Service]
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/pi/.Xauthority
-ExecStart=vncviewer 10.59.73.133 -WarnUnencrypted=0 -Fullscreen -HideCloseAlert=1 -KeepAliveResponseTimeout=1 -KeepAliveInterval=10
+ExecStart=vncviewer 10.59.73.194 -WarnUnencrypted=0 -HideCloseAlert=1 -KeepAliveResponseTimeout=1 -KeepAliveInterval=10 -geometry 1920x1080+1920+0
 Restart=always
 RestartSec=10s
 KillMode=process
@@ -37,3 +37,4 @@ TimeoutSec=infinity
 [Install]
 WantedBy=graphical.target
 ```
+To put on second monitor, add x offset (3rd argument in -geometry) to be 1 full screen width
