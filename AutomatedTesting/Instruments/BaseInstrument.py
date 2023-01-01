@@ -30,74 +30,85 @@ class BaseInstrument:
 
     def __init__(
         self,
-        resourceManager: ResourceManager,
-        visaAddress: str,
-        instrumentName: str,
-        expectedIdnResponse: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
         verify: bool,
         logger: logging.Logger,
+        only_software_control: bool = True,
         **kwargs,
     ):
-        self.resourceManager = resourceManager
-        self.visaAddress = visaAddress
-        self.instrumentName = instrumentName
-        self.expectedIdnResponse = expectedIdnResponse
+        self.resource_manager = resource_manager
+        self.visa_address = visa_address
+        self.name = name
+        self.expected_idn_response = expected_idn_response
         self.verify = verify
         self.logger = logger
         self.kwargs = kwargs
+        self.only_software_control = only_software_control
 
         self.dev = None  # Connection to the device
         self.lock = Lock()  # lock for access to the device connection
 
     def __enter__(self):
+        self.initialise()
+
+    def initialise(self):
         """
         Opens connection to the instrument, checks the IDN response is correct
         and begins monitoring for errors
         """
         self.open_connection()
-        self.logger.info(f"Connected to {self.instrumentName}")
+        self.logger.info(f"Connected to {self.name}")
 
-        # Reset the Device and start error monitoring thread
-        self.reset()
+        # Reset the Device and start error monitoring thread only if only under software control
+        # (as opposed to being used interactively)
+        if self.only_software_control:
+            self.reset()
 
-        self.errorProcess = Process(
-            target=self.check_instrument_errors, args=[os.getpid()], daemon=True
-        )
-        self.errorProcess.start()
+            self.error_process = Process(
+                target=self.check_instrument_errors, args=[os.getpid()], daemon=True
+            )
+            self.error_process.start()
 
-        # Lock front panel control of the instrument
-        self.set_remote_control()
-        self.logger.info(f"{self.instrumentName} initialised")
+            # Lock front panel control of the instrument
+            self.set_remote_control()
+        self.logger.info(f"{self.name} initialised")
 
     def __exit__(self, *args, **kwargs):
-        self.set_local_control()
-        if self.errorProcess:
-            self.errorProcess.terminate()
+        self.cleanup()
+
+    def cleanup(self):
+        if self.only_software_control:
+            self.set_local_control()
+            if self.error_process:
+                self.error_process.terminate()
         if self.dev:
             self.dev.close()
             self.dev = None
-            self.logger.info(f"Connection to {self.instrumentName} closed")
+            self.logger.info(f"Connection to {self.name} closed")
 
     def open_connection(self):
         """
         Opens the connection to the device
         """
         try:
-            self.dev = self.resourceManager.open_resource(
-                self.visaAddress, **self.kwargs
+            self.dev = self.resource_manager.open_resource(
+                self.visa_address, **self.kwargs
             )
         except (VisaIOError, ValueError, SerialException):
             raise InstrumentConnectionError(
-                f'Connection to "{self.instrumentName}" at VISA address '
-                f'"{self.visaAddress}" failed.\r\nAvailable VISA address:'
-                f" {self.resourceManager.list_resources()}"
+                f'Connection to "{self.name}" at VISA address '
+                f'"{self.visa_address}" failed.\r\nAvailable VISA address:'
+                f" {self.resource_manager.list_resources()}"
             )
 
         # Check device ID to ensure we're connecting the right thing
         idnString = self.query_id()
-        assert idnString == self.expectedIdnResponse, (
-            f"Unexpected IDN response from {self.instrumentName}. "
-            f'Expected response: "{self.expectedIdnResponse}", '
+        assert idnString == self.expected_idn_response, (
+            f"Unexpected IDN response from {self.name}. "
+            f'Expected response: "{self.expected_idn_response}", '
             f'Received response: "{idnString}"'
         )
 
@@ -116,6 +127,10 @@ class BaseInstrument:
                 # Just in case the instrument automatically goes to remote
                 self.set_local_control()
                 self.dev.close()
+
+    def is_connected(self) -> bool:
+        """Returns True if connected to the instrument"""
+        return bool(self.dev)
 
     def set_remote_control(self):
         """
@@ -136,15 +151,15 @@ class BaseInstrument:
         It queries the instrument then processes the results
         and decides whether to flag an issue to the main process
         """
-        self.logger.debug(f"Started error monitoring thread for {self.instrumentName}")
+        self.logger.debug(f"Started error monitoring thread for {self.name}")
         while True:
             sleep(3)
-            errorList = self.get_instrument_errors()
-            if errorList:
-                for errorCode, errorMessage in errorList:
+            error_list = self.get_instrument_errors()
+            if error_list:
+                for code, message in error_list:
                     self.logger.error(
-                        f"{self.instrumentName} reporting error "
-                        f"{errorCode} ({errorMessage}). Shutting down..."
+                        f"{self.name} reporting error "
+                        f"{code} ({message}). Shutting down..."
                     )
 
                 # Inform main thread
@@ -155,18 +170,18 @@ class BaseInstrument:
         Function to extract error messages from the device.
         This can be overwritten by sub-classes if this uses different syntax
         """
-        errorList = []
+        error_list = []
         errors = self._query("SYST:ERR?")
 
         for x in errors.split('",'):
-            errorCode, errorMessage = x.strip('"').split(',"')
+            code, message = x.strip('"').split(',"')
             # Last item in list isn't comma terminated so need
             # to manually remove trailing speech marks
-            errorCode = int(errorCode)
-            errorMessage.rstrip('"')
-            if errorCode:
-                errorList.append((errorCode, errorMessage))
-        return errorList
+            code = int(code)
+            message.rstrip('"')
+            if code:
+                error_list.append((code, message))
+        return error_list
 
     def query_id(self) -> str:
         """
@@ -200,7 +215,7 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)
-        self.logger.debug(x)  # @DEBUG
+        self.logger.debug(x)
 
     def _read(self, acquireLock: bool = True) -> str:
         """

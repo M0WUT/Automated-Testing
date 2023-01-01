@@ -1,7 +1,8 @@
 from logging import Logger
 
-from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 from pyvisa import ResourceManager
+
+from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 
 
 class PowerMeter(EntireInstrument):
@@ -14,27 +15,27 @@ class PowerMeter(EntireInstrument):
 
     def __init__(
         self,
-        resourceManager: ResourceManager,
-        visaAddress: str,
-        instrumentName: str,
-        expectedIdnResponse: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
         verify: bool,
         logger: Logger,
-        minFreq: float,
-        maxFreq: float,
+        min_freq: float,
+        max_freq: float,
         **kwargs,
     ):
         super().__init__(
-            resourceManager=resourceManager,
-            visaAddress=visaAddress,
-            instrumentName=instrumentName,
-            expectedIdnResponse=expectedIdnResponse,
+            resource_manager=resource_manager,
+            visa_address=visa_address,
+            name=name,
+            expected_idn_response=expected_idn_response,
             verify=verify,
             logger=logger,
             **kwargs,
         )
-        self.minFreq = minFreq
-        self.maxFreq = maxFreq
+        self.min_freq = min_freq
+        self.max_freq = max_freq
 
     def __enter__(self):
         super().__enter__()

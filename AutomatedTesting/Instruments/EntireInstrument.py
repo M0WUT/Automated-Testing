@@ -1,7 +1,8 @@
 from logging import Logger
 
-from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from pyvisa import ResourceManager
+
+from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 
 
 class EntireInstrument(BaseInstrument):
@@ -16,25 +17,25 @@ class EntireInstrument(BaseInstrument):
 
     def __init__(
         self,
-        resourceManager: ResourceManager,
-        visaAddress: str,
-        instrumentName: str,
-        expectedIdnResponse: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
         verify: bool,
         logger: Logger,
         **kwargs,
     ):
         super().__init__(
-            resourceManager=resourceManager,
-            visaAddress=visaAddress,
-            instrumentName=instrumentName,
-            expectedIdnResponse=expectedIdnResponse,
+            resource_manager=resource_manager,
+            visa_address=visa_address,
+            name=name,
+            expected_idn_response=expected_idn_response,
             verify=verify,
             logger=logger,
             **kwargs,
         )
         self.reserved = False  # Whether this instrument is in use
-        self.name = self.instrumentName
+        self.name = self.name
 
         # Used to remember previous freq to avoid continually updating it
         self.centreFreq = 0
@@ -48,10 +49,10 @@ class EntireInstrument(BaseInstrument):
         assert self.reserved is False, "Attempted to reserve a reserved device"
         self.name = purpose
         self.reserved = True
-        self.logger.info(f"{self.instrumentName} reserved as {self.name}")
+        self.logger.info(f"{self.name} reserved as {self.name}")
 
     def free(self):
         assert self.reserved
-        self.logger.debug(f"{self.instrumentName} freed from role as {self.name}")
-        self.name = self.instrumentName
+        self.logger.debug(f"{self.name} freed from role as {self.name}")
+        self.name = self.name
         self.reserved = False

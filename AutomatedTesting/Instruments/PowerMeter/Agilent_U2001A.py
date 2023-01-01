@@ -1,36 +1,40 @@
 from logging import Logger
 
+from pyvisa import ResourceManager
+
 from AutomatedTesting.Instruments.PowerMeter.PowerMeter import PowerMeter
 from AutomatedTesting.UsefulFunctions import readable_freq
-from pyvisa import ResourceManager
 
 
 class Agilent_U2001A(PowerMeter):
     def __init__(
         self,
-        resourceManager: ResourceManager,
-        visaAddress: str,
-        instrumentName: str,
-        expectedIdnResponse: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
         verify: bool,
         logger: Logger,
         **kwargs,
     ):
         super().__init__(
-            resourceManager=resourceManager,
-            visaAddress=visaAddress,
-            instrumentName=instrumentName,
-            expectedIdnResponse=expectedIdnResponse,
+            resource_manager=resource_manager,
+            visa_address=visa_address,
+            name=name,
+            expected_idn_response=expected_idn_response,
             verify=verify,
             logger=logger,
-            minFreq=10e6,
-            maxFreq=6e9,
+            min_freq=10e6,
+            max_freq=6e9,
             timeout=500,
             **kwargs,
         )
 
     def __enter__(self):
-        super().__enter__()
+        self.initialise()
+
+    def initialise(self):
+        super().initialise()
         self._write("INIT:CONT ON")
         return self
 

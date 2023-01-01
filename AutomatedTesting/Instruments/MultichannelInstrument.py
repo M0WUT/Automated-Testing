@@ -4,14 +4,15 @@ import signal
 from multiprocessing import Process
 from time import sleep
 
-from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from pyvisa import ResourceManager
+
+from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 
 
 class InstrumentChannel:
     def __init__(
         self,
-        channelNumber: int,
+        channel_number: int,
         instrument: BaseInstrument,
         logger: logging.Logger,
     ):
@@ -22,7 +23,7 @@ class InstrumentChannel:
         # they're assigned to so have to set as None and override later
         self.instrument = instrument
         self.name = None
-        self.channelNumber = channelNumber
+        self.channel_number = channel_number
         self.logger = logger
 
         self.reserved = False
@@ -44,8 +45,11 @@ class InstrumentChannel:
 
     def free(self):
         assert self.reserved, "Attempeted to free an already free channel"
+        if self.monitorProcess.is_alive():
+            self.monitorProcess.terminate()
+            self.monitorProcess.join(2)
         oldName = self.name
-        self.name = f"{self.instrument.instrumentName} - Channel {self.channelNumber}"
+        self.name = f"{self.instrument.name} - Channel {self.channel_number}"
         self.reserved = False
         self.logger.debug(f"{self.name} released from role as {oldName}")
 
@@ -57,7 +61,7 @@ class InstrumentChannel:
         self.logger.debug(f"Started error monitoring thread for {self.name}")
         while True:
             sleep(3)
-            errorList = self.instrument.get_channel_errors(self.channelNumber)
+            errorList = self.instrument.get_channel_errors(self.channel_number)
             if errorList:
                 for errorCode, errorMessage in errorList:
                     self.logger.error(
@@ -68,10 +72,10 @@ class InstrumentChannel:
                 # Inform main thread
                 os.kill(pid, signal.SIGUSR1)
 
-    def set_output_state(self, enabled: bool = True):
+    def set_output_enabled_state(self, enabled: bool = True):
         if enabled:
             assert not self.monitorProcess.is_alive() and self.reserved
-            self.instrument.enable_channel_output(self.channelNumber)
+            self.instrument.enable_channel_output(self.channel_number)
             sleep(0.5)  # Allow a small amount of time for inrush current
             self.monitorProcess.start()
             self.logger.debug(f"{self.name} - Output Enabled")
@@ -79,22 +83,22 @@ class InstrumentChannel:
             if self.monitorProcess.is_alive():
                 self.monitorProcess.terminate()
                 self.monitorProcess.join(2)
-            self.instrument.disable_channel_output(self.channelNumber)
+            self.instrument.disable_channel_output(self.channel_number)
             self.logger.debug(f"{self.name} - Output Disabled")
 
         if self.instrument.verify:
-            assert self.get_output_state() == enabled
+            assert self.get_output_enabled_state() == enabled
 
-    def get_output_state(self) -> bool:
-        return self.instrument.get_channel_output_state(self.channelNumber)
+    def get_output_enabled_state(self) -> bool:
+        return self.instrument.get_channel_output_enabled_state(self.channel_number)
 
     def enable_output(self):
-        self.set_output_state(True)
+        self.set_output_enabled_state(True)
 
     def disable_output(self):
-        self.set_output_state(False)
+        self.set_output_enabled_state(False)
 
-    def shutdown(self):
+    def cleanup(self):
         self.disable_output()
 
 
@@ -108,60 +112,70 @@ class MultichannelInstrument(BaseInstrument):
 
     def __init__(
         self,
-        resourceManager: ResourceManager,
-        visaAddress: str,
-        instrumentName: str,
-        expectedIdnResponse: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
         verify: bool,
-        channelCount: int,
+        channel_count: int,
         channels: list[InstrumentChannel],
         logger: logging.Logger,
         **kwargs,
     ):
         super().__init__(
-            resourceManager=resourceManager,
-            visaAddress=visaAddress,
-            instrumentName=instrumentName,
-            expectedIdnResponse=expectedIdnResponse,
+            resource_manager=resource_manager,
+            visa_address=visa_address,
+            name=name,
+            expected_idn_response=expected_idn_response,
             verify=verify,
             logger=logger,
             **kwargs,
         )
 
-        assert len(channels) == channelCount
-        expectedChannels = list(range(1, channelCount + 1))
-        foundChannels = [x.channelNumber for x in channels]
-        assert expectedChannels == foundChannels
+        assert len(channels) == channel_count
+        expected_channels = list(range(1, channel_count + 1))
+        found_channels = [x.channel_number for x in channels]
+        assert expected_channels == found_channels
 
         self.channels = channels
-        self.channelCount = channelCount
+        self.channel_count = channel_count
 
     def __enter__(self):
-        super().__enter__()
+        self.initialise()
+
+    def initialise(self):
+        super().initialise()
         for x in self.channels:
             x.instrument = self
-            x.name = f"{self.instrumentName} - Channel {x.channelNumber}"
-            x.disable_output()
+            x.name = f"{self.name} - Channel {x.channel_number}"
+            if self.only_software_control:
+                x.disable_output()
         return self
 
     def __exit__(self, *args, **kwargs):
-        for x in self.channels:
-            x.shutdown()
-        super().__exit__()
+        self.cleanup()
 
-    def set_channel_output_state(self, channelNumber: int, enabled: bool):
+    def cleanup(self):
+        for x in self.channels:
+            x.cleanup()
+        super().cleanup()
+
+    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
         raise NotImplementedError
 
-    def enable_channel_output(self, channelNumber: int):
-        self.set_channel_output_state(channelNumber, True)
+    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
+        raise NotImplementedError
 
-    def disable_channel_output(self, channelNumber: int):
-        self.set_channel_output_state(channelNumber, False)
+    def enable_channel_output(self, channel_number: int):
+        self.set_channel_output_enabled_state(channel_number, True)
+
+    def disable_channel_output(self, channel_number: int):
+        self.set_channel_output_enabled_state(channel_number, False)
 
     def validate_channel_number(self, number: int):
-        assert number in list(range(1, self.channelCount + 1))
+        assert number in list(range(1, self.channel_count + 1))
 
-    def reserve_channel(self, channelNumber: int, purpose: str) -> InstrumentChannel:
-        self.validate_channel_number(channelNumber)
-        self.channels[channelNumber - 1]._reserve(purpose)
-        return self.channels[channelNumber - 1]
+    def reserve_channel(self, channel_number: int, purpose: str) -> InstrumentChannel:
+        self.validate_channel_number(channel_number)
+        self.channels[channel_number - 1]._reserve(purpose)
+        return self.channels[channel_number - 1]
