@@ -77,7 +77,7 @@ class Tenma_Generic(PowerSupply):
         super()._write(command, acquireLock)
         sleep(0.1)  # Super important - do not delete
 
-    def _read(self):
+    def _read(self, num_bytes=0):
         """
         Reads data from PSU as it's infernal with no termination
 
@@ -90,19 +90,21 @@ class Tenma_Generic(PowerSupply):
         Raises:
             None
         """
-        return_string = ""
-        while True:
-            try:
-                return_string += self.dev.read_bytes(1).decode("utf-8")
-            except VisaIOError:
-                break
-
+        if num_bytes:
+            return_string = self.dev.read_bytes(num_bytes).decode("utf-8")
+        else:
+            return_string = ""
+            while True:
+                try:
+                    return_string += self.dev.read_bytes(1).decode("utf-8")
+                except VisaIOError:
+                    break
         assert return_string
 
         sleep(0.1)  # Super important - do not delete
         return return_string
 
-    def _query(self, command):
+    def _query(self, command, num_bytes=None):
         """
         Sends command and returns response
         Due to this PSU being a total pain,
@@ -120,7 +122,7 @@ class Tenma_Generic(PowerSupply):
         try:
             self.lock.acquire()
             self._write(command, acquireLock=False)
-            return self._read()
+            return self._read(num_bytes)
         finally:
             self.lock.release()
 
@@ -170,7 +172,7 @@ class Tenma_Generic(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VSET{channel_number}?"))
+        return float(self._query(f"VSET{channel_number}?", 5))
 
     def measure_channel_voltage(self, channel_number):
         """
@@ -186,7 +188,7 @@ class Tenma_Generic(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"VOUT{channel_number}?"))
+        return float(self._query(f"VOUT{channel_number}?", 5))
 
     def set_channel_current_limit(self, channel_number, current):
         """
@@ -219,7 +221,7 @@ class Tenma_Generic(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"ISET{channel_number}?"))
+        return float(self._query(f"ISET{channel_number}?", 6))
 
     def measure_channel_current(self, channel_number):
         """
@@ -235,7 +237,7 @@ class Tenma_Generic(PowerSupply):
         Raises:
             None
         """
-        return float(self._query(f"IOUT{channel_number}?"))
+        return float(self._query(f"IOUT{channel_number}?", 5))
 
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
         self._write(f"OUT{1 if bool(enabled) else 0}")
@@ -249,7 +251,7 @@ class Tenma_Generic(PowerSupply):
     def _get_status_byte(self) -> int:
         # Get status byte and convert to string in reverse
         # order so status[0] = bit 0
-        status = ord(self._query("STATUS?"))
+        status = ord(self._query("STATUS?", 1))
         status = format(status, "08b")[::-1]
         return status
 
