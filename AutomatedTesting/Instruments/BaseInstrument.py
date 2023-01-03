@@ -229,12 +229,13 @@ class BaseInstrument:
         if acquireLock:
             self.lock.acquire()
             try:
-                result = self.dev.read.strip()
+                result = self.dev.read().strip()
             finally:
                 self.lock.release()
         else:
             result = self.dev.read().strip()
 
+        self.logger.debug(f"READ: {result}")
         return result
 
     def _query(self, command: str) -> str:

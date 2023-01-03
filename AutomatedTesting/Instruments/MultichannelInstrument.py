@@ -156,8 +156,9 @@ class MultichannelInstrument(BaseInstrument):
         self.cleanup()
 
     def cleanup(self):
-        for x in self.channels:
-            x.cleanup()
+        if self.only_software_control:
+            for x in self.channels:
+                x.cleanup()
         super().cleanup()
 
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):

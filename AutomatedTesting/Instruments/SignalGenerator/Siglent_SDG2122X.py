@@ -76,7 +76,12 @@ class Siglent_SDG2122X(SignalGenerator):
 
     def get_channel_power(self, channel_number: int) -> float:
         channel_status = self._query(f"C{channel_number}:BSWV?")
-        return float(channel_status.split("AMPDBM,")[1].split("d")[0])
+        try:
+            return float(channel_status.split("AMPDBM,")[1].split("d")[0])
+        except IndexError:
+            # Asked for power in dBm into Hi-Z load
+            self.logger.warning("Requested power reading when set to Hi-Z load")
+            return -174
 
     def set_channel_freq(self, channel_number: int, freq: float):
         self._write(f"C{channel_number}:BSWV FRQ,{freq}")
@@ -116,3 +121,11 @@ class Siglent_SDG2122X(SignalGenerator):
             return float("inf")
         else:
             return float(impedance)
+
+    def set_channel_vpp(self, channel_number: int, voltage: float):
+        self._write(f"C{channel_number}:BSWV AMP,{voltage}")
+
+    def get_channel_vpp(self, channel_number: int) -> float:
+        channel_status = self._query(f"C{channel_number}:BSWV?")
+        vpp = float(channel_status.split("AMP,")[1].split("V,AMP")[0])
+        return vpp

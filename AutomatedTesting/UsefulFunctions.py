@@ -1,34 +1,52 @@
 from copy import copy
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy
 
 
-def readable_freq(freq: float) -> str:
+def prefixify(x: float, decimal_places: Optional[int] = None, units: str = "") -> str:
     """
-    Takes frequency in Hz and formats it nicely
+    Converts a value to use prefixes (and optionally round to a certain number of decimal places)
     """
-    if freq >= 1e9:
-        divider = 1e9
-        units = "GHz"
-    elif freq >= 1e6:
-        divider = 1e6
-        units = "MHz"
-    elif freq >= 1e3:
-        divider = 1e3
-        units = "kHz"
+    if abs(x) >= 1e12:
+        x /= 1e12
+        unit_prefix = "P"
+    elif abs(x) >= 1e9:
+        x /= 1e9
+        unit_prefix = "G"
+    elif abs(x) >= 1e6:
+        x /= 1e6
+        unit_prefix = "M"
+    elif abs(x) >= 1e3:
+        x /= 1e3
+        unit_prefix = "k"
+    elif abs(x) >= 1:
+        x /= 1
+        unit_prefix = ""
+    elif abs(x) >= 1e-3:
+        x *= 1e3
+        unit_prefix = "m"
+    elif abs(x) >= 1e-6:
+        x *= 1e6
+        unit_prefix = "μ"
+    elif abs(x) >= 1e-9:
+        x *= 1e9
+        unit_prefix = "n"
     else:
-        divider = 1
-        units = "Hz"
+        x *= 1e12
+        unit_prefix = "p"
 
-    x = str(float(freq) / divider)
-
-    # See if we can trim annoying ".0" that
-    # Python puts on integer floats
+    if decimal_places:
+        x = round(x, decimal_places)
+    x = str(x)
     if x[-2:] == ".0":
         x = x[:-2]
-    return x + units
+    return x + unit_prefix + units
+
+
+def readable_freq(freq: float) -> str:
+    return prefixify(freq, units="Hz")
 
 
 @dataclass
@@ -108,4 +126,4 @@ def best_fit_line_with_known_gradient(
 
 
 if __name__ == "__main__":
-    print(readable_freq(250e3))
+    print(readable_freq(13.2e-6))

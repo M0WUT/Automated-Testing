@@ -5,6 +5,7 @@ import time
 from typing import Dict
 
 from pyvisa import ResourceManager
+from pyvisa.constants import VI_ASRL_FLOW_DTR_DSR, StopBits
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
@@ -22,7 +23,7 @@ resource_manager = ResourceManager("@py")
 
 logger = logging.getLogger("m0wut_automated_testing")
 logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Console Logging
 logging_handler = logging.StreamHandler()

@@ -116,6 +116,7 @@ class SignalGeneratorChannel(InstrumentChannel):
                 max/min power
             AssertionError: If verified power != requested power
         """
+        assert self.get_load_impedance() == 50
         if (power < self.min_power) or (power > self.max_power):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")
         self.instrument.set_channel_power(self.channel_number, power)
@@ -135,6 +136,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             None
         """
+        assert self.get_load_impedance() == 50
         return self.instrument.get_channel_power(self.channel_number)
 
     def set_freq(self, freq):
@@ -228,6 +230,36 @@ class SignalGeneratorChannel(InstrumentChannel):
         """
         return self.instrument.get_channel_load_impedance(self.channel_number)
 
+    def set_vpp(self, voltage: float):
+        """
+        Sets channel output amplitude in Vpp
+
+        Args:
+            voltage(float): peak-to-peak voltage in V
+        Returns:
+            None
+        Raises:
+            AssertionError: If verified voltage != requested voltage
+        """
+        assert self.get_load_impedance() == float("inf")
+        self.instrument.set_channel_vpp(self.channel_number, voltage)
+        if self.instrument.verify:
+            assert self.get_vpp(self.channel_number) == voltage
+
+    def get_vpp(self) -> float:
+        """
+        Returns channel output amplitude in Vpp
+
+        Args:
+            None
+        Returns:
+            Output peak-to-peak voltage in V
+        Raises:
+            None
+        """
+        assert self.get_load_impedance() == float("inf")
+        return self.instrument.get_channel_vpp(self.channel_number)
+
 
 class SignalGenerator(MultichannelInstrument):
     """
@@ -291,4 +323,10 @@ class SignalGenerator(MultichannelInstrument):
         raise NotImplementedError  # pragma: no cover
 
     def get_channel_load_impedance(self, channel_number: int) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_vpp(self, channel_number: int, voltage: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_channel_vpp(self, channel_number) -> float:
         raise NotImplementedError  # pragma: no cover
