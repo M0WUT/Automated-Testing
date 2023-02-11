@@ -80,9 +80,8 @@ class InstrumentChannel:
             self.monitorProcess.start()
             self.logger.debug(f"{self.name} - Output Enabled")
         else:
-            if self.monitorProcess.is_alive():
-                self.monitorProcess.terminate()
-                self.monitorProcess.join(2)
+            self.monitorProcess.terminate()
+            self.monitorProcess.join()
             self.instrument.disable_channel_output(self.channel_number)
             self.logger.debug(f"{self.name} - Output Disabled")
 

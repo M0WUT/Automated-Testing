@@ -14,6 +14,10 @@ class Agilent34401A(DigitalMultimeter):
         self._write(":SYST:LOC")
         sleep(1)
 
+    def cleanup(self):
+        self.set_local_control()
+        super().cleanup()
+
     def reset(self):
         """
         Resets the device and clears all errors
@@ -23,5 +27,8 @@ class Agilent34401A(DigitalMultimeter):
 
         self._write("*CLS")
 
-    def measure_voltage(self) -> float:
-        return float(self._query("MEAS:VOLT:DC?"))
+    def measure_dc_voltage(self) -> float:
+        return float(self._query("MEAS:VOLT:DC? DEF,DEF"))
+
+    def measure_dc_current(self) -> float:
+        return float(self._query("MEAS:CURR:DC? 1,DEF"))

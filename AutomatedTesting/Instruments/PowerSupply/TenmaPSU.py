@@ -240,7 +240,7 @@ class Tenma_Generic(PowerSupply):
         return float(self._query(f"IOUT{channel_number}?", 5))
 
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
-        self._write(f"OUT{1 if bool(enabled) else 0}")
+        self._write(f"OUT{1 if enabled else 0}")
         if enabled:
             sleep(1)
 
@@ -254,6 +254,9 @@ class Tenma_Generic(PowerSupply):
         status = ord(self._query("STATUS?", 1))
         status = format(status, "08b")[::-1]
         return status
+
+    def get_channel_errors(self, channel_number):
+        return []
 
     def check_channel_errors(self, channel_number):
         """
