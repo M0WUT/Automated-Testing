@@ -5,48 +5,40 @@ from typing import List, Optional, Tuple
 import numpy
 
 
-def prefixify(x: float, decimal_places: Optional[int] = None, units: str = "") -> str:
+def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -> str:
     """
     Converts a value to use prefixes (and optionally round to a certain number of decimal places)
     """
-    if abs(x) >= 1e12:
-        x /= 1e12
-        unit_prefix = "P"
-    elif abs(x) >= 1e9:
-        x /= 1e9
-        unit_prefix = "G"
-    elif abs(x) >= 1e6:
-        x /= 1e6
-        unit_prefix = "M"
-    elif abs(x) >= 1e3:
-        x /= 1e3
-        unit_prefix = "k"
-    elif abs(x) >= 1:
-        x /= 1
-        unit_prefix = ""
-    elif abs(x) >= 1e-3:
-        x *= 1e3
-        unit_prefix = "m"
-    elif abs(x) >= 1e-6:
-        x *= 1e6
-        unit_prefix = "μ"
-    elif abs(x) >= 1e-9:
-        x *= 1e9
-        unit_prefix = "n"
-    else:
-        x *= 1e12
-        unit_prefix = "p"
 
-    if decimal_places:
-        x = round(x, decimal_places)
-    x = str(x)
-    if x[-2:] == ".0":
-        x = x[:-2]
-    return x + unit_prefix + units
+    AGILENT_OVERLOAD_MAGIC_NUMBER = 9.9e37
+
+    SI_PREFIXES = {
+        1e12: "P",
+        1e9: "G",
+        1e6: "M",
+        1e3: "k",
+        1: "",
+        1e-3: "m",
+        1e-6: "μ",
+        1e-9: "n",
+        1e-12: "p",
+    }
+
+    if x == AGILENT_OVERLOAD_MAGIC_NUMBER:
+        return "OVLD"
+
+    for exponent, prefix in SI_PREFIXES.items():
+        if x >= exponent:
+            x /= exponent
+
+            if decimal_places:
+                x = round(x, decimal_places)
+
+            return f"{x}{prefix}{units}"
 
 
 def readable_freq(freq: float) -> str:
-    return prefixify(freq, units="Hz")
+    return prefixify(freq, units="Hz", decimal_places=9)
 
 
 @dataclass
@@ -126,4 +118,4 @@ def best_fit_line_with_known_gradient(
 
 
 if __name__ == "__main__":
-    print(readable_freq(13.2e-6))
+    print(prefixify(13.2e6, "Hz", 2))

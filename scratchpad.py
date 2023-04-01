@@ -1,6 +1,9 @@
+import sys
+from time import sleep
+
 from AutomatedTesting.Instruments.InstrumentConfig import dmm
-from AutomatedTesting.UsefulFunctions import prefixify
 
 with dmm:
+    dmm.configure_resistance()
     while True:
-        print(prefixify(dmm.measure_voltage(), 3, "V"))
+        print(dmm._query("READ?"))

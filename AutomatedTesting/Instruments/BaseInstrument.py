@@ -47,6 +47,7 @@ class BaseInstrument:
         self.logger = logger
         self.kwargs = kwargs
         self.only_software_control = only_software_control
+        self.error_process = None
 
         self.dev = None  # Connection to the device
         self.lock = Lock()  # lock for access to the device connection
@@ -72,8 +73,6 @@ class BaseInstrument:
             )
             self.error_process.start()
 
-            # Lock front panel control of the instrument
-            self.set_remote_control()
         self.logger.info(f"{self.name} initialised")
 
     def __exit__(self, *args, **kwargs):
@@ -103,6 +102,9 @@ class BaseInstrument:
                 f'"{self.visa_address}" failed.\r\nAvailable VISA address:'
                 f" {self.resource_manager.list_resources()}"
             )
+
+        # Lock front panel control of the instrument
+        self.set_remote_control()
 
         # Check device ID to ensure we're connecting the right thing
         idnString = self.query_id()
@@ -215,7 +217,7 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)
-        self.logger.debug(x)
+        self.logger.debug(f"SENT: {x}")
 
     def _read(self, acquireLock: bool = True) -> str:
         """
@@ -235,7 +237,7 @@ class BaseInstrument:
         else:
             result = self.dev.read().strip()
 
-        self.logger.debug(f"READ: {result}")
+        self.logger.debug(f"RCVD: {result}")
         return result
 
     def _query(self, command: str) -> str:

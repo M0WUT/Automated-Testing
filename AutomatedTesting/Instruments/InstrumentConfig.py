@@ -5,7 +5,7 @@ import time
 from typing import Dict
 
 from pyvisa import ResourceManager
-from pyvisa.constants import VI_ASRL_FLOW_DTR_DSR, StopBits
+from pyvisa.constants import StopBits
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
@@ -23,11 +23,11 @@ resource_manager = ResourceManager("@py")
 
 logger = logging.getLogger("m0wut_automated_testing")
 logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Console Logging
 logging_handler = logging.StreamHandler()
-logging_handler.setLevel(logging.INFO)
+logging_handler.setLevel(logging.DEBUG)
 logging_handler.setFormatter(logging_format)
 logger.addHandler(logging_handler)
 
@@ -72,6 +72,8 @@ dmm = Agilent34401A(
     expected_idn_response="HEWLETT-PACKARD,34401A,0,10-5-2",
     verify=True,
     logger=logger,
+    stop_bits=StopBits.two,
+    timeout=None,
 )
 
 psu2 = Tenma_72_2535(
