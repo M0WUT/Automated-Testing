@@ -10,6 +10,7 @@ from pyvisa.constants import StopBits
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
 from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import Agilent_U2001A
+from AutomatedTesting.Instruments.PowerSupply.Siglent_SPD3303X import Siglent_SPD3303X
 from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import (
     Tenma_72_2535,
     Tenma_72_2940,
@@ -23,11 +24,11 @@ resource_manager = ResourceManager("@py")
 
 logger = logging.getLogger("m0wut_automated_testing")
 logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Console Logging
 logging_handler = logging.StreamHandler()
-logging_handler.setLevel(logging.INFO)
+logging_handler.setLevel(logging.DEBUG)
 logging_handler.setFormatter(logging_format)
 logger.addHandler(logging_handler)
 
@@ -73,7 +74,6 @@ dmm = Agilent34401A(
     verify=True,
     logger=logger,
     stop_bits=StopBits.two,
-    timeout=None,
 )
 
 psu2 = Tenma_72_2535(
@@ -90,6 +90,15 @@ psu3 = Tenma_72_2940(
     visa_address="ASRL/dev/serial/by-id/usb-Nuvoton_USB_Virtual_COM_001461000452-if00::INSTR",  # noqa E501
     name="Tenma 72-2940",
     expected_idn_response="TENMA 72-2940 V5.7 SN:39846080",
+    verify=True,
+    logger=logger,
+)
+
+psu4 = Siglent_SPD3303X(
+    resource_manager=resource_manager,
+    visa_address="TCPIP::10.59.73.57::INSTR",
+    name="Siglent SPD3303X",
+    expected_idn_response="Siglent Technologies,SPD3303X,SPD3XIEX6R2056,1.01.01.02.07R2,V3.0",
     verify=True,
     logger=logger,
 )

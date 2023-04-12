@@ -29,7 +29,7 @@ class InstrumentChannel:
         self.reserved = False
 
         self.name = None
-        self.monitorProcess = Process(
+        self.monitor_process = Process(
             target=self.check_channel_errors, args=[os.getpid()], daemon=True
         )
 
@@ -45,9 +45,9 @@ class InstrumentChannel:
 
     def free(self):
         assert self.reserved, "Attempeted to free an already free channel"
-        if self.monitorProcess.is_alive():
-            self.monitorProcess.terminate()
-            self.monitorProcess.join(2)
+        if self.monitor_process.is_alive():
+            self.monitor_process.terminate()
+            self.monitor_process.join(2)
         oldName = self.name
         self.name = f"{self.instrument.name} - Channel {self.channel_number}"
         self.reserved = False
@@ -74,19 +74,24 @@ class InstrumentChannel:
 
     def set_output_enabled_state(self, enabled: bool = True):
         if enabled:
-            assert not self.monitorProcess.is_alive() and self.reserved
+            assert not self.monitor_process.is_alive() and self.reserved
             self.instrument.enable_channel_output(self.channel_number)
             sleep(0.5)  # Allow a small amount of time for inrush current
-            self.monitorProcess.start()
+            self.monitor_process.start()
             self.logger.debug(f"{self.name} - Output Enabled")
         else:
-            self.monitorProcess.terminate()
-            self.monitorProcess.join()
+            if self.monitor_process and self.monitor_process.is_alive:
+                try:
+                    self.monitor_process.terminate()
+                    self.monitor_process.join()
+                except AttributeError:
+                    pass
             self.instrument.disable_channel_output(self.channel_number)
             self.logger.debug(f"{self.name} - Output Disabled")
 
         if self.instrument.verify:
-            assert self.get_output_enabled_state() == enabled
+            response = self.get_output_enabled_state()
+            assert response == enabled
 
     def get_output_enabled_state(self) -> bool:
         return self.instrument.get_channel_output_enabled_state(self.channel_number)

@@ -3,11 +3,10 @@ from time import sleep
 
 from pyvisa import ResourceManager, VisaIOError
 
-from AutomatedTesting.Instruments.MultichannelInstrument import InstrumentChannel
+from AutomatedTesting.Instruments.MultichannelInstrument import \
+    InstrumentChannel
 from AutomatedTesting.Instruments.PowerSupply.PowerSupply import (
-    PowerSupply,
-    PowerSupplyChannel,
-)
+    PowerSupply, PowerSupplyChannel)
 
 
 class Tenma_Generic(PowerSupply):
@@ -125,21 +124,6 @@ class Tenma_Generic(PowerSupply):
             return self._read(num_bytes)
         finally:
             self.lock.release()
-
-    def query_id(self):
-        """
-        Queries Device ID
-
-        Args:
-            None
-
-        Returns:
-            str: Device ID String
-
-        Raises:
-            None
-        """
-        return self._query("*IDN?")
 
     def set_channel_voltage(self, channel_number, voltage):
         """

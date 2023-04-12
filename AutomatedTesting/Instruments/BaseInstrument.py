@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import signal
 from multiprocessing import Lock, Process
 from time import sleep
@@ -176,11 +177,11 @@ class BaseInstrument:
         errors = self._query("SYST:ERR?")
 
         for x in errors.split('",'):
-            code, message = x.strip('"').split(',"')
+            code, message = x.split(",")
+            message.replace('"', "")
             # Last item in list isn't comma terminated so need
             # to manually remove trailing speech marks
             code = int(code)
-            message.rstrip('"')
             if code:
                 error_list.append((code, message))
         return error_list

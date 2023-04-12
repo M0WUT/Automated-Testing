@@ -45,8 +45,8 @@ class Agilent34401A(DigitalMultimeter):
         self._write(f"CONF:VOLT:DC {range},{resolution}")
         sleep(self.CONFIGURATION_DELAY)
 
-    def configure_dc_current(self, range=1, resolution="DEF"):
-        self._write(f"CONF:CURR_DC {range},{resolution}")
+    def configure_dc_current(self, range="DEF", resolution="DEF"):
+        self._write(f"CONF:CURR:DC {range},{resolution}")
         sleep(self.CONFIGURATION_DELAY)
 
     def configure_resistance(self, range="DEF", resolution="DEF"):

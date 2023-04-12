@@ -1,9 +1,8 @@
 import sys
 from time import sleep
 
-from AutomatedTesting.Instruments.InstrumentConfig import dmm
+from AutomatedTesting.Instruments.InstrumentConfig import psu4
 
-with dmm:
-    dmm.configure_resistance()
-    while True:
-        print(dmm._query("READ?"))
+psu4.verify = False
+with psu4:
+    pass
