@@ -16,19 +16,6 @@ class Agilent34401A(DigitalMultimeter):
         self._write(":SYST:LOC")
         sleep(1)
 
-    def cleanup(self):
-        self.set_local_control()
-        super().cleanup()
-
-    def reset(self):
-        """
-        Resets the device and clears all errors
-        """
-        self._write("*RST")
-        sleep(1)
-
-        self._write("*CLS")
-
     def measure_dc_voltage(self) -> float:
         return float(self._query("MEAS:VOLT:DC? DEF,DEF"))
 

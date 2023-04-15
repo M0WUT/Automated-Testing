@@ -19,6 +19,9 @@ from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import Agilent_
 from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
     Siglent_SDG2122X,
 )
+from AutomatedTesting.Instruments.SpectrumAnalyser.Siglent_SSA3032XPlus import (
+    Siglent_SSA3032XPlus,
+)
 
 resource_manager = ResourceManager("@py")
 
@@ -103,6 +106,15 @@ psu4 = Siglent_SPD3303X(
     logger=logger,
 )
 
+ssa3032x = Siglent_SSA3032XPlus(
+    resource_manager=resource_manager,
+    visa_address="TCPIP::10.59.73.133::INSTR",
+    name="Siglent SSA3032X+",
+    expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.5.1R1.r5",
+    verify=True,
+    logger=logger,
+)
+
 
 def check_online_instruments(instrument_list: list[BaseInstrument]) -> Dict[str, bool]:
     """
@@ -126,6 +138,8 @@ signal.signal(signal.SIGUSR1, panic)
 
 
 def main():
+    with ssa3032x:
+        pass
     instrument_list = [sdg2122x, u2001a, e4433b, dmm, psu2, psu3]
     while True:
         print(check_online_instruments(instrument_list))
