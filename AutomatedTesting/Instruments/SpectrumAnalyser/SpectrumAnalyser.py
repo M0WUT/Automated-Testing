@@ -1,4 +1,6 @@
+from enum import Enum, auto
 from logging import Logger
+from typing import List, Tuple
 
 from pyvisa import ResourceManager
 
@@ -6,6 +8,10 @@ from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 
 
 class SpectrumAnalyser(EntireInstrument):
+    class SweepMode(Enum):
+        SINGLE = auto()
+        CONTINUOUS = auto()
+
     def __init__(
         self,
         resource_manager: ResourceManager,
@@ -55,6 +61,15 @@ class SpectrumAnalyser(EntireInstrument):
         self.has_preamp = has_preamp
         self.supported_rbw = []
         self.supported_vbw = []
+        self.max_markers = 8
+
+    def __enter__(self):
+        super().__enter__()
+        self.set_sweep_mode(self.SweepMode.SINGLE)
+
+    def __exit__(self, *args, **kwargs):
+        self.set_sweep_mode(self.SweepMode.CONTINUOUS)
+        super().__exit__(*args, **kwargs)
 
     def set_start_freq(self, freq: float):
         """
@@ -288,6 +303,36 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
+    def set_sweep_mode(self, mode: SweepMode = SweepMode.CONTINUOUS):
+        """
+        Sets analyser into continuous or single sweep mode
+
+        Args:
+            mode(SweepMode): Mode to set the analyser to
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_sweep_mode(self) -> SweepMode:
+        """
+        Returns Sweep mode of the analyser
+
+        Args:
+            None
+
+        Returns:
+            SweepMode: Mode the analyser is in
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
     def set_sweep_points(self, num_points: int):
         """
         Sets number of sweep points
@@ -328,7 +373,7 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Raises:
-            Assertion: If readback value doesn't match requested value
+            AssertionError: If readback value doesn't match requested value
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -341,6 +386,172 @@ class SpectrumAnalyser(EntireInstrument):
 
         Returns:
             float: input attenuation in dB
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_ref_level(self, level: float):
+        """
+        Sets Reference Level
+
+        Args:
+            level (float): reference level in dBm
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested value
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_ref_level(self) -> float:
+        """
+        Reads input attenuation
+
+        Args:
+            None
+
+        Returns:
+            float: Reference Level in dBm
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_trace_data(self) -> List[Tuple[float, float]]:
+        """
+        Returns trace data
+
+        Args:
+            None
+
+        Returns:
+            List[Tuple[float, float]: List of (frequency in Hz, power in dBm) tuples
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
+        """
+        En/disables a marker
+
+        Args:
+            marker_number (int): which marker to en/disable
+            enabled (bool): Enable marker if True, Disable if False
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If <marker_number> is invalid
+            AssertionError: If readback state doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_marker_state(self, marker_number: int = 1) -> bool:
+        """
+        Returns state of a particular marker
+
+        Args:
+            marker_number (int): which marker to get the state of
+
+        Returns:
+            bool: True if the marker is enabled
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def enable_marker(self, marker_number: int = 1):
+        self.set_marker_state(marker_number, True)
+
+    def disable_marker(self, marker_number: int = 1):
+        self.set_marker_state(marker_number, False)
+
+    def set_marker_frequency(self, freq: float, marker_number: int = 1):
+        """
+        Sets marker to a particular frequency
+
+        Args:
+            freq (float): Frequency to set the marker to
+            marker_number (int): which marker to move
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If <marker_number> is invalid
+            AssertionError: If readback frequency doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_marker_frequency(self, marker_number: int = 1) -> float:
+        """
+        Reads frequency a particular marker is set to
+
+        Args:
+            marker_number (int): which marker to query
+
+        Returns:
+            float: marker frequency in Hz
+
+        Raises:
+            ValueError: If <marker_number> is invalid
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def measure_marker_power(self, marker_number: int = 1) -> float:
+        """
+        Reads power for a a particular marker
+
+        Args:
+            marker_number (int): which marker to query
+
+        Returns:
+            float: marker power in dBm
+
+        Raises:
+            ValueError: If <marker_number> is invalid
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def measure_power(self, freq: float, marker_number: int = 1) -> float:
+        """
+        Measure power at a certain frequency by placing a
+        marker and reporting the value
+
+        Args:
+            freq (float): frequency in Hz
+
+        Returns:
+            float: power in dBm
+
+        Raises:
+            ValueError: If <freq> is not within the trace data
+        """
+        if marker_number > self.max_markers:
+            raise ValueError
+        if not self.get_marker_state(marker_number):
+            self.enable_marker(marker_number)
+        self.set_marker_frequency(freq, marker_number)
+        return self.measure_marker_power(marker_number)
+
+    def trigger_sweep(self):
+        """
+        Triggers a sweep and blocks until completion
+
+        Args:
+            None
+
+        Returns:
+            None
 
         Raises:
             None

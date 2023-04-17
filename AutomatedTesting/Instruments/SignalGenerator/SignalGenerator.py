@@ -7,7 +7,7 @@ from AutomatedTesting.Instruments.MultichannelInstrument import (
     InstrumentChannel,
     MultichannelInstrument,
 )
-from AutomatedTesting.UsefulFunctions import readable_freq
+from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
 class SignalGeneratorModulation(Enum):

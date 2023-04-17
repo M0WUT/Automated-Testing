@@ -2,10 +2,11 @@ import pickle
 from datetime import datetime
 from time import sleep
 
-from AutomatedTesting.ExcelHandler import ExcelWorksheetWrapper
-from AutomatedTesting.Instruments.InstrumentConfig import e4433b, u2001a
-from AutomatedTesting.UsefulFunctions import readable_freq
 from xlsxwriter import Workbook
+
+from AutomatedTesting.Instruments.InstrumentConfig import e4433b, u2001a
+from AutomatedTesting.Misc.ExcelHandler import ExcelWorksheetWrapper
+from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 MIN_POWER = -60
 MAX_POWER = 13

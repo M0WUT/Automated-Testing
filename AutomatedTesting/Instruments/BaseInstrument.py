@@ -252,3 +252,10 @@ class BaseInstrument:
         finally:
             self.lock.release()
         return response
+
+    def wait_until_op_complete(self):
+        """
+        Blocks until current commmands have all been executed
+        """
+        while self._query("*OPC?") == "0":
+            sleep(0.1)

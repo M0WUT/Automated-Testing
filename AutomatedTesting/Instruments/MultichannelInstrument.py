@@ -74,13 +74,16 @@ class InstrumentChannel:
 
     def set_output_enabled_state(self, enabled: bool = True):
         if enabled:
-            assert not self.monitor_process.is_alive() and self.reserved
+            assert self.monitor_process.is_alive() is False and self.reserved
             self.instrument.enable_channel_output(self.channel_number)
             sleep(0.5)  # Allow a small amount of time for inrush current
+            self.monitor_process = Process(
+                target=self.check_channel_errors, args=[os.getpid()], daemon=True
+            )
             self.monitor_process.start()
             self.logger.debug(f"{self.name} - Output Enabled")
         else:
-            if self.monitor_process and self.monitor_process.is_alive:
+            if self.monitor_process and self.monitor_process.is_alive():
                 try:
                     self.monitor_process.terminate()
                     self.monitor_process.join()

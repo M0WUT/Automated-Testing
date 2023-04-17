@@ -27,7 +27,7 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
         self.hidden_rows = []
         self.name = name
         self.headers_row = 0
-        self.headers_column = "A"
+        self.headers_column = 0
         self.chart = None
 
         now = datetime.now()
@@ -86,13 +86,14 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
     def plot_current_column(self):
         # Plot upper tone
         column = chr(self.current_column + ord("A"))
+        headers_column = chr(self.headers_column + ord("A"))
         # +1 for data being one row lower, +1 for stupid 0/1 indexing
         start_row = self.headers_row + 2
         self.chart.add_series(
             {
                 "name": f"='{self.name}'!${column}${self.headers_row + 1}",
-                "categories": f"='{self.name}'!${self.headers_column}${start_row}:"  # noqa E501
-                f"${self.headers_column}{self.max_row + 1}",
+                "categories": f"='{self.name}'!${headers_column}${start_row}:"  # noqa E501
+                f"${headers_column}{self.max_row + 1}",
                 "values": f"='{self.name}'!${column}${start_row}:"
                 f"${column}{self.max_row + 1}",
             }

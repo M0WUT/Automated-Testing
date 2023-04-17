@@ -3,7 +3,7 @@ from logging import Logger
 from pyvisa import ResourceManager
 
 from AutomatedTesting.Instruments.PowerMeter.PowerMeter import PowerMeter
-from AutomatedTesting.UsefulFunctions import readable_freq
+from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
 class Agilent_U2001A(PowerMeter):

@@ -1,6 +1,7 @@
 from logging import Logger
 from typing import List, Tuple
 
+from numpy import linspace
 from pyvisa import ResourceManager
 
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
@@ -148,6 +149,20 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
     def get_vbw_rbw_ratio(self) -> float:
         return float(self._query(":BWID:VID:RAT?"))
 
+    def set_sweep_mode(
+        self, mode: SpectrumAnalyser.SweepMode = SpectrumAnalyser.SweepMode.CONTINUOUS
+    ):
+        self._write(f":INIT:CONT {'1' if mode == self.SweepMode.CONTINUOUS else '0'}")
+        if self.verify:
+            assert self.get_sweep_mode() == mode
+
+    def get_sweep_mode(self) -> SpectrumAnalyser.SweepMode:
+        return (
+            SpectrumAnalyser.SweepMode.CONTINUOUS
+            if self._query(":INIT:CONT?") == "1"
+            else SpectrumAnalyser.SweepMode.SINGLE
+        )
+
     def set_sweep_points(self, num_points: int):
         # Fixed 751 point operation
         if num_points != 751:
@@ -168,3 +183,52 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
 
     def get_input_attenuation(self) -> float:
         return float(self._query(":POW:ATT?"))
+
+    def set_ref_level(self, level: float):
+        self._write(f":DISP:WIND:TRAC:Y:RLEV {level}")
+        if self.verify:
+            assert self.get_ref_level() == level
+
+    def get_ref_level(self) -> float:
+        return float(self._query(":DISP:WIND:TRAC:Y:RLEV?"))
+
+    def get_trace_data(self) -> List[float]:
+        data = self._query(":TRAC:DATA?")
+        powers = [float(x) for x in data.split(",")]
+        freqs = linspace(
+            self.get_start_freq(), self.get_stop_freq(), self.get_sweep_points()
+        )
+        return list(zip(freqs, powers))
+
+    def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
+        if marker_number > self.max_markers:
+            raise ValueError
+        self._write(f":CALC:MARK{marker_number}:STAT {'ON' if enabled else 'OFF'}")
+        if self.verify:
+            assert self.get_marker_state(marker_number) == enabled
+
+    def get_marker_state(self, marker_number: int = 1) -> bool:
+        if marker_number > self.max_markers:
+            raise ValueError
+        return self._query(f":CALC:MARK{marker_number}:STAT?") == "1"
+
+    def set_marker_frequency(self, freq: float, marker_number: int = 1):
+        if marker_number > self.max_markers:
+            raise ValueError
+        self._write(f":CALC:MARK{marker_number}:X {freq}")
+        if self.verify:
+            assert self.get_marker_frequency(marker_number) == freq
+
+    def get_marker_frequency(self, marker_number: int = 1) -> float:
+        if marker_number > self.max_markers:
+            raise ValueError
+        return float(self._query(f":CALC:MARK{marker_number}:X?"))
+
+    def measure_marker_power(self, marker_number: int = 1) -> float:
+        if marker_number > self.max_markers:
+            raise ValueError
+        return float(self._query(f":CALC:MARK{marker_number}:Y?"))
+
+    def trigger_sweep(self):
+        self._write(":INIT:IMM")
+        self.wait_until_op_complete()
