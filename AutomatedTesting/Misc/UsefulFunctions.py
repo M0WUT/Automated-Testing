@@ -64,7 +64,7 @@ def best_fit_line_with_known_gradient(
     xValues: List[float],
     yValues: List[float],
     expectedGradient: float = 3,
-    maxErrorPercentage: float = 2,
+    maxErrorPercentage: float = 1,
 ) -> StraightLine:
     """
     Takes a list of y and x values, attempts to find line by removing data

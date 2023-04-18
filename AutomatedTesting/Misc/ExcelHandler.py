@@ -46,8 +46,9 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
         self.write(5, 0, "Notes")
         self.write(5, 1, test_notes)
 
-        self.headers_row = 7
+        self.headers_row = 8
         self.current_row = self.headers_row
+        self.current_column = 0
 
     def hide_current_column(self) -> None:
         column_letter = chr(self.current_column + ord("A"))

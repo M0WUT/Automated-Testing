@@ -9,13 +9,19 @@ import xlsxwriter
 
 from AutomatedTesting.Instruments.InstrumentConfig import sdg2122x, ssa3032x
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
-    SignalGenerator, SignalGeneratorChannel)
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
-    SpectrumAnalyser
+    SignalGenerator,
+    SignalGeneratorChannel,
+)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
 from AutomatedTesting.Misc.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Misc.UsefulFunctions import (
-    StraightLine, best_fit_line_with_known_gradient, intercept_point,
-    readable_freq)
+    StraightLine,
+    best_fit_line_with_known_gradient,
+    intercept_point,
+    readable_freq,
+)
 
 
 @dataclass
@@ -86,7 +92,7 @@ def run_imd_test(
         spectrumAnalyser.set_rbw(
             resolutionBandWidth
             if resolutionBandWidth
-            else pow(10, math.floor(math.log10(toneSpacing / 50)))
+            else pow(10, math.floor(math.log10(toneSpacing / 200)))
         )
 
         # Sanity check measurement
@@ -180,12 +186,12 @@ def run_imd_test(
     overallWorksheet.initialise(name=overallResultsWorksheetName)
     overallWorksheet.set_column(first_col=0, last_col=0, width=140)
     overallWorksheet.set_column(first_col=1, last_col=200, width=18)
-    overallWorksheet.headers_column = 2
-    # chart = workbook.add_chart({"type": "scatter", "subtype": "straight_with_markers"})
-    # overallWorksheet.chart = chart
-    # chart.set_title({"name": "Intermodulation Distortion"})
-    # chart.set_size({"x_scale": 2, "y_scale": 2})
-    # overallWorksheet.insert_chart(0, 0, chart)
+    chart = workbook.add_chart({"type": "scatter", "subtype": "straight_with_markers"})
+    overallWorksheet.chart = chart
+    chart.set_title({"name": "Intermodulation Distortion"})
+    chart.set_size({"x_scale": 2, "y_scale": 2})
+    overallWorksheet.headers_column = 1
+    overallWorksheet.insert_chart(overallWorksheet.headers_row, 0, chart)
 
     # Have to rediscover details about the sweep as we may have
     # loaded the results
@@ -202,19 +208,15 @@ def run_imd_test(
 
         worksheet.set_column(first_col=0, last_col=0, width=140)
         worksheet.set_column(first_col=1, last_col=200, width=18)
-        worksheet.headers_column = 4
+        worksheet.headers_column = 1
 
         datapoints = imdSweeps[freq]
         freqResults = {}
 
         # @ TODO Add equipment information
 
-        # Add section headings
-        worksheet.new_row()
-        worksheet.new_row()
-        worksheet.save_headers_row()
         # Leave left column blank for the chart
-        worksheet.current_column += 1
+        worksheet.current_column = 1
 
         # Create chart object and headings
         centeredFormat = workbook.add_format({"align": "center"})
@@ -232,7 +234,7 @@ def run_imd_test(
         chart.set_title({"name": f"IMD - {readable_freq(freq)}"})
         chart.set_size({"x_scale": 2, "y_scale": 2})
 
-        worksheet.insert_chart(0, 0, chart)
+        worksheet.insert_chart(worksheet.headers_row, 0, chart)
 
         # Attempt to linearise all of the curves and add headings for
         # measurements and best fit lines (if we could find one)
@@ -458,78 +460,80 @@ def run_imd_test(
 
     # # We now have all the data plotted so add a final sheet
     # # with the overall results
-    # overallWorksheet.new_column()
-    # overallWorksheet.write_and_move_down("Frequency (MHz)")
-    # for freq in results:
-    #     overallWorksheet.write_and_move_down(freq / 1e6)
-    # overallWorksheet.new_column()
-    # worksheet = overallWorksheet
-    # chart = worksheet.chart
-    # chart.show_blanks_as("span")
-    # chart.set_x_axis(
-    #     {
-    #         "name": "Frequency (MHz)",
-    #         "crossing": -200,
-    #         "major_gridlines": {"visible": True},
-    #     }
-    # )
+    overallWorksheet.new_column()
+    overallWorksheet.write_and_move_down("Frequency (MHz)")
+    for freq in results:
+        overallWorksheet.write_and_move_down(freq / 1e6)
+    overallWorksheet.new_column()
+    worksheet = overallWorksheet
+    chart = worksheet.chart
+    chart.show_blanks_as("span")
+    chart.set_x_axis(
+        {
+            "name": "Frequency (MHz)",
+            "crossing": -200,
+            "major_gridlines": {"visible": True},
+        }
+    )
 
-    # chart.set_y_axis(
-    #     {
-    #         "name": "Power per Tone (dBm)",
-    #         "crossing": -200,
-    #         "major_gridlines": {"visible": True},
-    #         "minor_gridlines": {"visible": True},
-    #     }
-    # )
-    # for imd in intermodTerms:
-    #     worksheet.write_and_move_down(f"IIP{imd} (dBm)")
-    #     gotResults = False
-    #     for freq in results:
-    #         try:
-    #             x = results[freq][imd].iipn
-    #             worksheet.write_and_move_down(round(x, 2) if x else "")
-    #             gotResults = True
-    #         except KeyError:
-    #             worksheet.write_and_move_down("")
-    #     if gotResults:
-    #         column = chr(worksheet.current_column + ord("A"))
-    #         startRow = worksheet.headers_row + 2
-    #         chart.add_series(
-    #             {
-    #                 "name": f"IIP{imd}",
-    #                 "categories": f"='{worksheet.name}'!${worksheet.headers_column}${startRow}:"
-    #                 f"${worksheet.headers_column}{worksheet.max_row + 1}",
-    #                 "values": f"='{worksheet.name}'!${column}${startRow}:"
-    #                 f"${column}{worksheet.max_row + 1}",
-    #                 "line": {"dash_type": "round_dot"},
-    #             }
-    #         )
+    chart.set_y_axis(
+        {
+            "name": "Power per Tone (dBm)",
+            "crossing": -200,
+            "major_gridlines": {"visible": True},
+            "minor_gridlines": {"visible": True},
+        }
+    )
+    for imd in intermodTerms:
+        worksheet.write_and_move_down(f"IIP{imd} (dBm)")
+        gotResults = False
+        for freq in results:
+            try:
+                x = results[freq][imd].iipn
+                worksheet.write_and_move_down(round(x, 2) if x else "")
+                gotResults = True
+            except KeyError:
+                worksheet.write_and_move_down("")
+        if gotResults:
+            column = chr(worksheet.current_column + ord("A"))
+            headers_column = chr(worksheet.headers_column + ord("A"))
+            startRow = worksheet.headers_row + 2
+            chart.add_series(
+                {
+                    "name": f"IIP{imd}",
+                    "categories": f"='{worksheet.name}'!${headers_column}${startRow}:"
+                    f"${headers_column}{worksheet.max_row + 1}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{worksheet.max_row + 1}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
 
-    #     worksheet.new_column()
-    #     worksheet.write_and_move_down(f"OIP{imd} (dBm)")
-    #     gotResults = False
-    #     for freq in results:
-    #         try:
-    #             x = results[freq][imd].oipn
-    #             worksheet.write_and_move_down(round(x, 2) if x else "")
-    #             gotResults = True
-    #         except KeyError:
-    #             worksheet.write_and_move_down("")
-    #     if gotResults:
-    #         column = chr(worksheet.current_column + ord("A"))
-    #         startRow = worksheet.headers_row + 2
-    #         chart.add_series(
-    #             {
-    #                 "name": f"OIP{imd}",
-    #                 "categories": f"='{worksheet.name}'!${worksheet.headers_column}${startRow}:"
-    #                 f"${worksheet.headers_column}{worksheet.max_row + 1}",
-    #                 "values": f"='{worksheet.name}'!${column}${startRow}:"
-    #                 f"${column}{worksheet.max_row + 1}",
-    #                 "line": {"dash_type": "round_dot"},
-    #             }
-    #         )
-    #     worksheet.new_column()
+        worksheet.new_column()
+        worksheet.write_and_move_down(f"OIP{imd} (dBm)")
+        gotResults = False
+        for freq in results:
+            try:
+                x = results[freq][imd].oipn
+                worksheet.write_and_move_down(round(x, 2) if x else "")
+                gotResults = True
+            except KeyError:
+                worksheet.write_and_move_down("")
+        if gotResults:
+            column = chr(worksheet.current_column + ord("A"))
+            headers_column = chr(worksheet.headers_column + ord("A"))
+            startRow = worksheet.headers_row + 2
+            chart.add_series(
+                {
+                    "name": f"OIP{imd}",
+                    "categories": f"='{worksheet.name}'!${headers_column}${startRow}:"
+                    f"${headers_column}{worksheet.max_row + 1}",
+                    "values": f"='{worksheet.name}'!${column}${startRow}:"
+                    f"${column}{worksheet.max_row + 1}",
+                    "line": {"dash_type": "round_dot"},
+                }
+            )
+        worksheet.new_column()
 
     if not excelWorkbook:
         workbook.close()
