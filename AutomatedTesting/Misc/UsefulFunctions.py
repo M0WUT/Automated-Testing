@@ -78,13 +78,13 @@ def best_fit_line_with_known_gradient(
     # noise floor / compression so run a rough check on points
     # with pairwise gradient that's completely outside of spec
     try:
-        while abs(((y[1] - y[0]) / (x[1] - x[0])) - expectedGradient) > 1:
+        while abs(((y[1] - y[0]) / (x[1] - x[0])) - expectedGradient) > 0.5:
             x = x[1:]
             y = y[1:]
     except IndexError:
         return None
     try:
-        while abs(((y[-1] - y[-2]) / (x[-1] - x[-2])) - expectedGradient) > 1:
+        while abs(((y[-1] - y[-2]) / (x[-1] - x[-2])) - expectedGradient) > 0.5:
             x = x[:-1]
             y = y[:-1]
     except IndexError:

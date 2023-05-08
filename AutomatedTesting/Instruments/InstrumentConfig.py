@@ -9,6 +9,9 @@ from pyvisa.constants import StopBits
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
+from AutomatedTesting.Instruments.Oscilloscope.Keysight_MSOX2024A import (
+    Keysight_MSOX2024A,
+)
 from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import Agilent_U2001A
 from AutomatedTesting.Instruments.PowerSupply.Siglent_SPD3303X import Siglent_SPD3303X
 from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import (
@@ -115,6 +118,15 @@ ssa3032x = Siglent_SSA3032XPlus(
     logger=logger,
 )
 
+scope = Keysight_MSOX2024A(
+    resource_manager=resource_manager,
+    visa_address="TCPIP::10.59.73.194::INSTR",
+    name="Keysight MSOX2024A",
+    expected_idn_response="AGILENT TECHNOLOGIES,MSO-X 2024A,MY56040858,02.41.2015102200",
+    verify=True,
+    logger=logger,
+)
+
 
 def check_online_instruments(instrument_list: list[BaseInstrument]) -> Dict[str, bool]:
     """
@@ -138,12 +150,12 @@ signal.signal(signal.SIGUSR1, panic)
 
 
 def main():
-    with ssa3032x:
-        pass
-    instrument_list = [sdg2122x, u2001a, e4433b, dmm, psu2, psu3]
-    while True:
-        print(check_online_instruments(instrument_list))
-        time.sleep(2)
+    with scope:
+        time.sleep(1)
+    # instrument_list = [sdg2122x, u2001a, e4433b, dmm, psu2, psu3]
+    # while True:
+    #     print(check_online_instruments(instrument_list))
+    #     time.sleep(2)
 
 
 if __name__ == "__main__":

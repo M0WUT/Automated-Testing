@@ -198,6 +198,7 @@ class BaseInstrument:
         """
         self._write("*RST")
         # Wait for reset to complete
+        sleep(1)
         while self._query("*OPC?") == "0":
             pass
         self._write("*CLS")
