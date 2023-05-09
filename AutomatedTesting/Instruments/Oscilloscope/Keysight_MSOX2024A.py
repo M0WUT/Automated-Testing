@@ -7,6 +7,21 @@ from AutomatedTesting.Instruments.Oscilloscope.Oscilloscope import (
     OscilloscopeChannel,
 )
 
+ALLOWED_VOLTS_PER_DIV = [
+    10e-3,
+    20e-3,
+    50e-3,
+    100e-3,
+    200e-3,
+    500e-3,
+    1,
+    2,
+    5,
+    10,
+    20,
+    50,
+]
+
 
 class Keysight_MSOX2024A(Oscilloscope):
     def __init__(
@@ -34,6 +49,7 @@ class Keysight_MSOX2024A(Oscilloscope):
                     logger=logger,
                     max_voltage=200,
                     max_frequency=200e6,
+                    allowed_volts_per_div=ALLOWED_VOLTS_PER_DIV,
                 ),
                 OscilloscopeChannel(
                     channel_number=2,
@@ -41,6 +57,7 @@ class Keysight_MSOX2024A(Oscilloscope):
                     logger=logger,
                     max_voltage=200,
                     max_frequency=200e6,
+                    allowed_volts_per_div=ALLOWED_VOLTS_PER_DIV,
                 ),
                 OscilloscopeChannel(
                     channel_number=3,
@@ -48,6 +65,7 @@ class Keysight_MSOX2024A(Oscilloscope):
                     logger=logger,
                     max_voltage=200,
                     max_frequency=200e6,
+                    allowed_volts_per_div=ALLOWED_VOLTS_PER_DIV,
                 ),
                 OscilloscopeChannel(
                     channel_number=4,
@@ -55,6 +73,7 @@ class Keysight_MSOX2024A(Oscilloscope):
                     logger=logger,
                     max_voltage=200,
                     max_frequency=200e6,
+                    allowed_volts_per_div=ALLOWED_VOLTS_PER_DIV,
                 ),
             ],
             logger=logger,
@@ -76,3 +95,30 @@ class Keysight_MSOX2024A(Oscilloscope):
 
     def get_channel_display_enabled_state(self, channel_number: int) -> bool:
         return self._query(f":CHAN{channel_number}:DISP?") == "1"
+
+    def measure_channel_rms_voltage(self, channel_number: int) -> float:
+        x = float(self._query(f":MEAS:VRMS? CYCL,DC,CHAN{channel_number}"))
+        if x == 9.9e37:
+            return float("inf")
+        else:
+            return float(x)
+
+    def set_timebase_scale(self, seconds_per_div: float):
+        self._write(f":TIM:SCAL {seconds_per_div}")
+        if self.verify:
+            assert self.get_timebase_scale() == seconds_per_div
+
+    def get_timebase_scale(self) -> float:
+        return float(self._query(":TIM:SCAL?"))
+
+    def set_channel_voltage_range(self, channel_number: int, voltage_range: float):
+        self._write(f":CHAN{channel_number}:RANG {voltage_range}")
+
+    def get_channel_voltage_range(self, channel_number: int) -> float:
+        return float(self._query(f":CHAN{channel_number}:RANG?"))
+
+    def set_channel_voltage_scale(self, channel_number: int, volts_per_div: float):
+        self._write(f":CHAN{channel_number}:SCAL {volts_per_div}")
+
+    def get_channel_voltage_scale(self, channel_number: int) -> float:
+        return float(self._query(f":CHAN{channel_number}:SCAL?"))

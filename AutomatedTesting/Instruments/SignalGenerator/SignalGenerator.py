@@ -4,9 +4,7 @@ from typing import List, Tuple
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.MultichannelInstrument import (
-    InstrumentChannel,
-    MultichannelInstrument,
-)
+    InstrumentChannel, MultichannelInstrument)
 from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
@@ -244,7 +242,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         assert self.get_load_impedance() == float("inf")
         self.instrument.set_channel_vpp(self.channel_number, voltage)
         if self.instrument.verify:
-            assert self.get_vpp(self.channel_number) == voltage
+            assert self.get_vpp() == voltage
 
     def get_vpp(self) -> float:
         """

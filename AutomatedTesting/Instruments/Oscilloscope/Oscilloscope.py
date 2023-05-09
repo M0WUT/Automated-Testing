@@ -14,9 +14,11 @@ class OscilloscopeChannel(InstrumentChannel):
         logger: logging.Logger,
         max_voltage: float,
         max_frequency: float,
+        allowed_volts_per_div: list[float],
     ):
         self.max_voltage = max_voltage
         self.max_frequency = max_frequency
+        self.allowed_volts_per_div = allowed_volts_per_div
         super().__init__(
             channel_number=channel_number, instrument=instrument, logger=logger
         )
@@ -79,6 +81,40 @@ class OscilloscopeChannel(InstrumentChannel):
     def disable_display(self):
         self.set_display_enabled_state(False)
 
+    def measure_rms(self) -> float:
+        """
+        Measures RMS voltage in Volts
+        """
+        return self.instrument.measure_channel_rms_voltage(self.channel_number)
+
+    def set_voltage_range(self, voltage_range: float):
+        """
+        Sets maximum range in Volts
+        """
+        self.instrument.set_channel_voltage_range(self.channel_number, voltage_range)
+        if self.instrument.verify:
+            assert self.get_voltage_range() == voltage_range
+
+    def get_voltage_range(self) -> float:
+        """
+        Returns full scale range in Volts
+        """
+        return float(self.instrument.get_channel_voltage_range(self.channel_number))
+
+    def set_voltage_scale(self, volts_per_div: float):
+        """
+        Sets Volts per division
+        """
+        self.instrument.set_channel_voltage_scale(self.channel_number, volts_per_div)
+        if self.instrument.verify:
+            assert self.get_voltage_scale() == volts_per_div
+
+    def get_voltage_scale(self) -> float:
+        """
+        Returns Volts per division
+        """
+        return float(self.instrument.get_channel_voltage_scale(self.channel_number))
+
 
 class Oscilloscope(MultichannelInstrument):
     def initialise(self):
@@ -103,5 +139,29 @@ class Oscilloscope(MultichannelInstrument):
     def get_channel_display_enabled_state(self, channel_number: int) -> bool:
         """
         Returns True if the channel is enabled
+        """
+        raise NotImplementedError
+
+    def measure_channel_rms_voltage(self, channel_number: int) -> float:
+        raise NotImplementedError
+
+    def set_timebase_scale(self, seconds_per_div: float):
+        raise NotImplementedError
+
+    def get_timebase_scale(self) -> float:
+        """
+        Returns in seconds per division
+        """
+        raise NotImplementedError
+
+    def set_channel_voltage_range(self, channel_number: int, voltage_range: float):
+        """
+        Sets channel full scale range in Volts
+        """
+        raise NotImplementedError
+
+    def get_channel_voltage_range(self, channel_number: int) -> float:
+        """
+        Returns channel full scale range in Volts
         """
         raise NotImplementedError

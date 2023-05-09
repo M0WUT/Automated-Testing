@@ -11,3 +11,4 @@ linux-gpib/*
 *.xlsx
 **/*.egg-info
 *.out
+*.csv
