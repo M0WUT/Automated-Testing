@@ -9,19 +9,13 @@ import xlsxwriter
 
 from AutomatedTesting.Instruments.InstrumentConfig import sdg2122x, ssa3032x
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
-    SignalGenerator,
-    SignalGeneratorChannel,
-)
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    SpectrumAnalyser,
-)
+    SignalGenerator, SignalGeneratorChannel)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
+    SpectrumAnalyser
 from AutomatedTesting.Misc.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Misc.UsefulFunctions import (
-    StraightLine,
-    best_fit_line_with_known_gradient,
-    intercept_point,
-    readable_freq,
-)
+    StraightLine, best_fit_line_with_known_gradient, intercept_point,
+    readable_freq)
 
 
 @dataclass
@@ -66,7 +60,6 @@ def run_imd_test(
     excelWorkbook: Optional[xlsxwriter.workbook.Workbook] = None,
     combinerInsertionLoss: float = 3.3,
 ):
-
     datapoints: List[IMDMeasurementPoint]
     imdSweeps: "dict[float, List[IMDMeasurementPoint]]"
     results: "dict[float, dict]"
@@ -199,7 +192,6 @@ def run_imd_test(
     sweptFrequencies = list(imdSweeps.keys())
     sweptFrequencies.sort()
     for freq in sweptFrequencies:
-
         worksheetName = f"IMD Measurements - {readable_freq(freq)}"
         worksheet = workbook.add_worksheet(worksheetName)
 
@@ -221,14 +213,6 @@ def run_imd_test(
 
         # Create chart object and headings
         centeredFormat = workbook.add_format({"align": "center"})
-        worksheet.merge_range(
-            worksheet.headers_row - 1,
-            1,
-            worksheet.headers_row - 1,
-            worksheet.max_column,
-            "Power per Tone (dBm)",
-            centeredFormat,
-        )
 
         chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
         worksheet.chart = chart
@@ -379,6 +363,15 @@ def run_imd_test(
 
             freqResults[imdTone] = measuredIPn
         results[freq] = freqResults
+
+        worksheet.merge_range(
+            worksheet.headers_row - 1,
+            2,
+            worksheet.headers_row - 1,
+            worksheet.max_column,
+            "Output Power per Tone (dBm)",
+            centeredFormat,
+        )
 
         # Plot markers for each of the IPn points
         # Bearing in mind, there might not be any

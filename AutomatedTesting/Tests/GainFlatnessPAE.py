@@ -23,7 +23,10 @@ from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 @dataclass
 class SingleMeasurement:
     input_power: float
+    output_power: float
     gain: float
+    dc_voltage: float
+    dc_current: float
     pae: float
 
 
@@ -32,6 +35,7 @@ def run_gain_flatness_test(
     input_power_list: list[float],
     sig_gen: SignalGeneratorChannel,
     power_meter: Union[PowerMeter, SpectrumAnalyser],
+    ref_level: float,
     dmm: DigitalMultimeter,
     supply_voltage: float = 5,
     loss_before_dut: float = 0.2,
@@ -55,7 +59,7 @@ def run_gain_flatness_test(
                 power_meter.set_centre_freq(freq)
             for power in input_power_list:
                 if isinstance(power_meter, SpectrumAnalyser):
-                    power_meter.set_ref_level(30)
+                    power_meter.set_ref_level(ref_level)
 
                 sig_gen.set_power(power + loss_before_dut)
 
@@ -72,14 +76,22 @@ def run_gain_flatness_test(
                 gain = dut_output_power - dut_input_power
                 dut_input_power_watts = 10 ** ((dut_input_power - 30) / 10)
                 dut_output_power_watts = 10 ** ((dut_output_power - 30) / 10)
-                dut_dc_power = supply_voltage * dmm.measure_dc_current()
+                dut_dc_current = dmm.measure_dc_current()
+                dut_dc_power = supply_voltage * dut_dc_current
                 pae = (
                     100
                     * (dut_output_power_watts - dut_input_power_watts)
                     / dut_dc_power
                 )
                 results[freq].append(
-                    SingleMeasurement(input_power=dut_input_power, gain=gain, pae=pae)
+                    SingleMeasurement(
+                        input_power=dut_input_power,
+                        output_power=dut_output_power,
+                        gain=gain,
+                        dc_voltage=supply_voltage,
+                        dc_current=dut_dc_current,
+                        pae=pae,
+                    )
                 )
 
         # Save results
@@ -148,12 +160,27 @@ def run_gain_flatness_test(
                 worksheet.write_and_move_down(data.input_power)
             worksheet.new_column()
 
+        worksheet.write_and_move_down(f"Output Power (dBm) - {readable_freq(freq)}")
+        for data in datapoints:
+            worksheet.write_and_move_down(round(data.output_power, 2))
+        worksheet.new_column()
+
         worksheet.write_and_move_down(f"Gain (dB) - {readable_freq(freq)}")
         for data in datapoints:
             worksheet.write_and_move_down(round(data.gain, 2))
         worksheet.plot_current_column(
             {"line": {"color": colour}, "name": readable_freq(freq)}
         )
+        worksheet.new_column()
+
+        worksheet.write_and_move_down(f"Supply Voltage (V) - {readable_freq(freq)}")
+        for data in datapoints:
+            worksheet.write_and_move_down(round(data.dc_voltage, 2))
+        worksheet.new_column()
+
+        worksheet.write_and_move_down(f"Supply Current (mA) - {readable_freq(freq)}")
+        for data in datapoints:
+            worksheet.write_and_move_down(int(1000 * data.dc_current))
         worksheet.new_column()
 
         worksheet.write_and_move_down(f"PAE (%) - {readable_freq(freq)}")
