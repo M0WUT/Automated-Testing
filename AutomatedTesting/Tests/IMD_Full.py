@@ -64,6 +64,7 @@ def run_imd_test(
     useZeroSpan: bool = False,
     pickleFile: str = None,
     excelWorkbook: Optional[xlsxwriter.workbook.Workbook] = None,
+    combinerInsertionLoss: float = 3.3,
 ):
 
     datapoints: List[IMDMeasurementPoint]
@@ -136,8 +137,8 @@ def run_imd_test(
 
             power = lowerPowerLimit
             while power <= upperPowerLimit:
-                channel1.set_power(round(power + 3.3, 3))
-                channel2.set_power(round(power + 3.3, 3))
+                channel1.set_power(round(power + combinerInsertionLoss, 3))
+                channel2.set_power(round(power + combinerInsertionLoss, 3))
                 spectrumAnalyser.trigger_sweep()
 
                 newDatapoint = IMDMeasurementPoint(toneSetpoint=power)
@@ -156,9 +157,9 @@ def run_imd_test(
 
                 datapoints.append(newDatapoint)
 
-                # Go in 2dB steps if negligible IMD else go in 1dB steps
+                # Go in 2dB steps if negligible IMD else go in 0.25dB steps
                 if measure_power(2 * f2 - f1) > noiseFloor + 3:
-                    power += 1
+                    power += 0.25
                 else:
                     power += 2
 
@@ -511,28 +512,28 @@ def run_imd_test(
 
         worksheet.new_column()
         worksheet.write_and_move_down(f"OIP{imd} (dBm)")
-        gotResults = False
+
         for freq in results:
             try:
                 x = results[freq][imd].oipn
                 worksheet.write_and_move_down(round(x, 2) if x else "")
-                gotResults = True
+
             except KeyError:
                 worksheet.write_and_move_down("")
-        if gotResults:
-            column = chr(worksheet.current_column + ord("A"))
-            headers_column = chr(worksheet.headers_column + ord("A"))
-            startRow = worksheet.headers_row + 2
-            chart.add_series(
-                {
-                    "name": f"OIP{imd}",
-                    "categories": f"='{worksheet.name}'!${headers_column}${startRow}:"
-                    f"${headers_column}{worksheet.max_row + 1}",
-                    "values": f"='{worksheet.name}'!${column}${startRow}:"
-                    f"${column}{worksheet.max_row + 1}",
-                    "line": {"dash_type": "round_dot"},
-                }
-            )
+
+        column = chr(worksheet.current_column + ord("A"))
+        headers_column = chr(worksheet.headers_column + ord("A"))
+        startRow = worksheet.headers_row + 2
+        chart.add_series(
+            {
+                "name": f"OIP{imd}",
+                "categories": f"='{worksheet.name}'!${headers_column}${startRow}:"
+                f"${headers_column}{worksheet.max_row + 1}",
+                "values": f"='{worksheet.name}'!${column}${startRow}:"
+                f"${column}{worksheet.max_row + 1}",
+                "line": {"dash_type": "round_dot"},
+            }
+        )
         worksheet.new_column()
 
     if not excelWorkbook:

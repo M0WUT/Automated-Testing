@@ -19,6 +19,9 @@ from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import (
     Tenma_72_2940,
 )
 from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import Agilent_E4433B
+from AutomatedTesting.Instruments.SignalGenerator.RohdeAndSchwarz_SMB100A import (
+    RohdeAndSchwarz_SMB100A,
+)
 from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
     Siglent_SDG2122X,
 )
@@ -123,6 +126,15 @@ scope = Keysight_MSOX2024A(
     visa_address="TCPIP::10.59.73.194::INSTR",
     name="Keysight MSOX2024A",
     expected_idn_response="AGILENT TECHNOLOGIES,MSO-X 2024A,MY56040858,02.41.2015102200",
+    verify=True,
+    logger=logger,
+)
+
+smb100a = RohdeAndSchwarz_SMB100A(
+    resource_manager=resource_manager,
+    visa_address="TCPIP::10.59.73.125::INSTR",
+    name="R&S SMB100A",
+    expected_idn_response="Rohde&Schwarz,SMB100A,1406.6000k03/180437,3.1.19.15-3.20.390.24",
     verify=True,
     logger=logger,
 )

@@ -33,6 +33,8 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
 
             if decimal_places:
                 x = round(x, decimal_places)
+            x = str(x)
+            x.removesuffix(".0")
 
             return f"{x}{prefix}{units}"
 

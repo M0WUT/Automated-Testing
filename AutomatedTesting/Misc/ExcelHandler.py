@@ -13,6 +13,19 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
     hidden_columns: List[int]
     headers_row: int
 
+    AVAILABLE_COLOURS = [
+        "blue",
+        "red",
+        "green",
+        "orange",
+        "purple",
+        "magenta",
+        "cyan",
+        "gray",
+        "brown",
+        "black",
+    ]
+
     def initialise(
         self,
         name,
@@ -84,18 +97,24 @@ class ExcelWorksheetWrapper(xlsxwriter.workbook.Worksheet):
     def save_headers_row(self):
         self.headers_row = self.current_row
 
-    def plot_current_column(self):
+    def plot_current_column(self, extra_commands: dict = None):
+        """
+        Plots current column with self.headers_column as x axis
+        Set second_y_axis to True to plot on secondary y axis
+        """
+
         # Plot upper tone
         column = chr(self.current_column + ord("A"))
         headers_column = chr(self.headers_column + ord("A"))
         # +1 for data being one row lower, +1 for stupid 0/1 indexing
         start_row = self.headers_row + 2
-        self.chart.add_series(
-            {
-                "name": f"='{self.name}'!${column}${self.headers_row + 1}",
-                "categories": f"='{self.name}'!${headers_column}${start_row}:"  # noqa E501
-                f"${headers_column}{self.max_row + 1}",
-                "values": f"='{self.name}'!${column}${start_row}:"
-                f"${column}{self.max_row + 1}",
-            }
-        )
+        commands = {
+            "name": f"='{self.name}'!${column}${self.headers_row + 1}",
+            "categories": f"='{self.name}'!${headers_column}${start_row}:"  # noqa E501
+            f"${headers_column}{self.max_row + 1}",
+            "values": f"='{self.name}'!${column}${start_row}:"
+            f"${column}{self.max_row + 1}",
+        }
+        if extra_commands:
+            commands.update(extra_commands)
+        self.chart.add_series(commands)

@@ -49,6 +49,7 @@ class BaseInstrument:
         self.kwargs = kwargs
         self.only_software_control = only_software_control
         self.error_process = None
+        self.instrument_name = name
 
         self.dev = None  # Connection to the device
         self.lock = Lock()  # lock for access to the device connection
@@ -219,7 +220,7 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)
-        self.logger.debug(f"SENT: {x}")
+        self.logger.debug(f"[{self.instrument_name}] SENT:  {x}")
 
     def _read(self, acquireLock: bool = True) -> str:
         """
@@ -239,7 +240,7 @@ class BaseInstrument:
         else:
             result = self.dev.read().strip()
 
-        self.logger.debug(f"RCVD: {result}")
+        self.logger.debug(f"[{self.instrument_name}] RCVD: {result}")
         return result
 
     def _query(self, command: str) -> str:
