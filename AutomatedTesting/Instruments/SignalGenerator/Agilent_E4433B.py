@@ -59,11 +59,11 @@ class Agilent_E4433B(SignalGenerator):
     def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
         return []  # Doesn't have channel specific errors
 
-    def set_channel_output_state(self, channel_number: int, enabled: bool):
+    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
         # Single channel instrument so ignore channel_number
         self._write(f"OUTP:STAT {'1' if enabled else '0'}")
 
-    def get_channel_output_state(self, channel_number: int) -> bool:
+    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
         # Single channel instrument so ignore channel_number
         response = self._query("OUTP:STAT?")
         return response == "1"

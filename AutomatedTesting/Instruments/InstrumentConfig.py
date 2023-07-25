@@ -132,7 +132,7 @@ scope = Keysight_MSOX2024A(
 
 smb100a = RohdeAndSchwarz_SMB100A(
     resource_manager=resource_manager,
-    visa_address="TCPIP::10.59.73.125::INSTR",
+    visa_address="TCPIP::10.59.73.10::INSTR",
     name="R&S SMB100A",
     expected_idn_response="Rohde&Schwarz,SMB100A,1406.6000k03/180437,3.1.19.15-3.20.390.24",
     verify=True,

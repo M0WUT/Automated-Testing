@@ -1,0 +1,6 @@
+pyvisa
+pyvisa-py
+numpy
+scipy
+pyusb
+pyserial

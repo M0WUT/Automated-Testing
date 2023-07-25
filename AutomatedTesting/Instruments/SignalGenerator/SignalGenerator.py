@@ -4,7 +4,9 @@ from typing import List, Tuple
 
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 from AutomatedTesting.Instruments.MultichannelInstrument import (
-    InstrumentChannel, MultichannelInstrument)
+    InstrumentChannel,
+    MultichannelInstrument,
+)
 from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
@@ -114,6 +116,7 @@ class SignalGeneratorChannel(InstrumentChannel):
                 max/min power
             AssertionError: If verified power != requested power
         """
+        power = round(power, 1)
         assert self.get_load_impedance() == 50
         if (power < self.min_power) or (power > self.max_power):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")

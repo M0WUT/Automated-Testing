@@ -2,6 +2,7 @@ import argparse
 import logging
 import math
 import pickle
+import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
@@ -9,13 +10,19 @@ import xlsxwriter
 
 from AutomatedTesting.Instruments.InstrumentConfig import sdg2122x, ssa3032x
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
-    SignalGenerator, SignalGeneratorChannel)
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
-    SpectrumAnalyser
+    SignalGenerator,
+    SignalGeneratorChannel,
+)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
 from AutomatedTesting.Misc.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Misc.UsefulFunctions import (
-    StraightLine, best_fit_line_with_known_gradient, intercept_point,
-    readable_freq)
+    StraightLine,
+    best_fit_line_with_known_gradient,
+    intercept_point,
+    readable_freq,
+)
 
 
 @dataclass
@@ -31,11 +38,7 @@ class IMDMeasurementPoint:
 
 @dataclass
 class SingleFreqSingleIMDPoint:
-    upperBestFit: StraightLine = None
-    lowerBestFit: StraightLine = None
-    # Final results are the ones use to calculate IIPn/OIPn
-    # and should be equal to either upper or lower best fit
-    finalBestFit: StraightLine = None
+    best_fit: StraightLine = None
     iipn: float = None
     oipn: float = None
 
@@ -76,17 +79,17 @@ def run_imd_test(
         # Setup Spectrum analyser
         spectrumAnalyser.set_ref_level(refLevel)
         if resolutionBandWidth:
-            if resolutionBandWidth > toneSpacing / 200:
+            if resolutionBandWidth > toneSpacing / 20:
                 logging.warning(
                     f"Requested RBW of {resolutionBandWidth} is too large"
-                    "(> Tone Spacing / 200) and may lead to inaccurate"
+                    "(> Tone Spacing / 20) and may lead to inaccurate"
                     " results"
                 )
 
         spectrumAnalyser.set_rbw(
             resolutionBandWidth
             if resolutionBandWidth
-            else pow(10, math.floor(math.log10(toneSpacing / 200)))
+            else pow(10, math.floor(math.log10(toneSpacing / 20)))
         )
 
         # Sanity check measurement
@@ -130,8 +133,11 @@ def run_imd_test(
 
             power = lowerPowerLimit
             while power <= upperPowerLimit:
+                spectrumAnalyser.set_ref_level(refLevel)
                 channel1.set_power(round(power + combinerInsertionLoss, 3))
                 channel2.set_power(round(power + combinerInsertionLoss, 3))
+                spectrumAnalyser.trigger_sweep()
+                spectrumAnalyser.set_ref_level(int(measure_power(f1)) + 5)
                 spectrumAnalyser.trigger_sweep()
 
                 newDatapoint = IMDMeasurementPoint(toneSetpoint=power)
@@ -150,12 +156,8 @@ def run_imd_test(
 
                 datapoints.append(newDatapoint)
 
-                # Go in 2dB steps if negligible IMD else go in 0.25dB steps
-                if measure_power(2 * f2 - f1) > noiseFloor + 3:
-                    power += 0.25
-                else:
-                    power += 2
-
+                # Increase in 0.25dB steps
+                power += 0.25
             # Save sweep to dictionary of IMD sweeps
             imdSweeps[freq] = datapoints
 
@@ -195,7 +197,6 @@ def run_imd_test(
         worksheetName = f"IMD Measurements - {readable_freq(freq)}"
         worksheet = workbook.add_worksheet(worksheetName)
 
-        # Update worksheet to class with M0WUT wrapper
         worksheet.__class__ = ExcelWorksheetWrapper
         worksheet.initialise(name=worksheetName)
 
@@ -261,29 +262,6 @@ def run_imd_test(
             worksheet.new_column()
             worksheet.current_row = worksheet.headers_row
 
-            # Upper tone - best fit
-            measuredIPn.upperBestFit = best_fit_line_with_known_gradient(
-                [x.toneSetpoint for x in datapoints],
-                [x.imdPoints[imdTone + 0.1] for x in datapoints],
-                expectedGradient=imdTone,
-            )
-
-            if imdTone == 1:
-                assert measuredIPn.upperBestFit
-                toneBestFit = measuredIPn.upperBestFit
-
-            if measuredIPn.upperBestFit:
-                worksheet.hide_current_column()
-                worksheet.write_and_move_down(f"{toneName} - Upper (Best Fit)")
-                for x in datapoints:
-                    worksheet.write_and_move_down(
-                        measuredIPn.upperBestFit.evaluate(x.toneSetpoint)
-                    )
-                # Super high power point for trace extrapolation
-                worksheet.write_and_move_down(measuredIPn.upperBestFit.evaluate(100))
-                worksheet.new_column()
-                worksheet.current_row = worksheet.headers_row
-
             # Lower tone
             worksheet.write_and_move_down(f"{toneName} - Lower")
             for x in datapoints:
@@ -292,81 +270,58 @@ def run_imd_test(
             worksheet.new_column()
             worksheet.current_row = worksheet.headers_row
 
-            # Lower tone - best fit
-            measuredIPn.lowerBestFit = best_fit_line_with_known_gradient(
+            # Best fit on average of both tones
+            measuredIPn.best_fit = best_fit_line_with_known_gradient(
                 [x.toneSetpoint for x in datapoints],
-                [x.imdPoints[imdTone] for x in datapoints],
+                [
+                    0.5 * (x.imdPoints[imdTone] + x.imdPoints[imdTone + 0.1])
+                    for x in datapoints
+                ],
                 expectedGradient=imdTone,
             )
 
-            if measuredIPn.lowerBestFit:
+            if imdTone == 1:
+                assert measuredIPn.best_fit, "Couldn't fit line to tone power"
+                tone_best_fit = measuredIPn.best_fit
+
+            if measuredIPn.best_fit:
                 worksheet.hide_current_column()
-                worksheet.write_and_move_down(f"{toneName} - Lower (Best Fit)")
+                worksheet.write_and_move_down(f"{toneName} - Best Fit")
                 for x in datapoints:
                     worksheet.write_and_move_down(
-                        measuredIPn.lowerBestFit.evaluate(x.toneSetpoint)
+                        measuredIPn.best_fit.evaluate(x.toneSetpoint)
                     )
                 # Super high power point for trace extrapolation
-                worksheet.write_and_move_down(measuredIPn.lowerBestFit.evaluate(100))
+                worksheet.write_and_move_down(measuredIPn.best_fit.evaluate(100))
                 worksheet.new_column()
                 worksheet.current_row = worksheet.headers_row
 
-            # Select which best fit line is being used to calculate intercept
-            # point
-            if imdTone > 1:
-                # Calculate Intercept points
-                if measuredIPn.upperBestFit and measuredIPn.lowerBestFit:
-                    # we got best fit lines for both
-                    _, upperIPn = intercept_point(toneBestFit, measuredIPn.upperBestFit)
-                    _, lowerIPn = intercept_point(toneBestFit, measuredIPn.lowerBestFit)
-                    # Work out which has worse IPn as that is what we'll quote
-                    # as the result
-                    if lowerIPn < upperIPn:
-                        measuredIPn.finalBestFit = measuredIPn.lowerBestFit
-                        best_fit_column = worksheet.current_column - 1
-                    else:
-                        measuredIPn.finalBestFit = measuredIPn.upperBestFit
-                        best_fit_column = worksheet.current_column - 3
-                elif measuredIPn.upperBestFit:
-                    measuredIPn.finalBestFit = measuredIPn.upperBestFit
-                    best_fit_column = worksheet.current_column - 2
-                elif measuredIPn.lowerBestFit:
-                    # There's a lower best fit and no upper best fit
-                    measuredIPn.finalBestFit = measuredIPn.lowerBestFit
-                    best_fit_column = worksheet.current_column - 1
-                else:
-                    continue
-
-                if measuredIPn.finalBestFit:
+                if imdTone > 1:
                     measuredIPn.iipn, measuredIPn.oipn = intercept_point(
-                        measuredIPn.finalBestFit, toneBestFit
+                        measuredIPn.best_fit, tone_best_fit
                     )
-            else:
-                # For the tone, always use the upper
-                best_fit_column = worksheet.current_column - 3
-                measuredIPn.finalBestFit = measuredIPn.upperBestFit
 
-            column = chr(best_fit_column + ord("A"))
-            headers_column = chr(worksheet.headers_column + ord("A"))
-            startRow = worksheet.headers_row + 2
-            chart.add_series(
-                {
-                    "name": f"{toneName} - Best Fit",
-                    "categories": f"='{worksheet.name}'"
-                    f"!${headers_column}${startRow}:"
-                    f"${headers_column}{worksheet.max_row + 1}",
-                    "values": f"='{worksheet.name}'!${column}${startRow}:"
-                    f"${column}{worksheet.max_row + 1}",
-                    "line": {"dash_type": "round_dot"},
-                }
-            )
+                column = chr(worksheet.current_column - 1 + ord("A"))
+                headers_column = chr(worksheet.headers_column + ord("A"))
+                startRow = worksheet.headers_row + 2
+                chart.add_series(
+                    {
+                        "name": f"{toneName} - Best Fit",
+                        "categories": f"='{worksheet.name}'"
+                        f"!${headers_column}${startRow}:"
+                        f"${headers_column}{worksheet.max_row + 1}",
+                        "values": f"='{worksheet.name}'!${column}${startRow}:"
+                        f"${column}{worksheet.max_row + 1}",
+                        "line": {"dash_type": "round_dot"},
+                    }
+                )
 
             freqResults[imdTone] = measuredIPn
         results[freq] = freqResults
 
         worksheet.merge_range(
             worksheet.headers_row - 1,
-            2,
+            1,
             worksheet.headers_row - 1,
             worksheet.max_column,
             "Output Power per Tone (dBm)",
@@ -394,7 +349,7 @@ def run_imd_test(
                 ipnLabels.append(
                     {
                         "value": f"IIP{imdTone} = {round(x.iipn, 1)}dBm\n"
-                        f"OIP3 = {round(x.oipn, 1)}dBm"
+                        f"OIP{imdTone} = {round(x.oipn, 1)}dBm"
                     }
                 )
                 maxX = max(maxX, x.iipn)

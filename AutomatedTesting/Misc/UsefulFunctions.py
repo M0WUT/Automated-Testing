@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import numpy
+from scipy import stats
 
 
 def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -> str:
@@ -66,56 +67,82 @@ def best_fit_line_with_known_gradient(
     xValues: List[float],
     yValues: List[float],
     expectedGradient: float = 3,
-    maxErrorPercentage: float = 1,
+    maxErrorPercentage: float = 3,
+    window_size: int = 11,
 ) -> StraightLine:
     """
     Takes a list of y and x values, attempts to find line by removing data
     from whichever ends has gradient furthest from expected
     """
     assert len(xValues) == len(yValues)
-    x = copy(xValues)
-    y = copy(yValues)
+    if window_size % 2 == 0:
+        raise NotImplementedError("Only supports odd window sizes")
+    x = numpy.array(xValues)
+    y = numpy.array(yValues)
+    gradients = []
 
-    # Distortion is probably at the start / end due to
-    # noise floor / compression so run a rough check on points
-    # with pairwise gradient that's completely outside of spec
-    try:
-        while abs(((y[1] - y[0]) / (x[1] - x[0])) - expectedGradient) > 0.5:
-            x = x[1:]
-            y = y[1:]
-    except IndexError:
-        return None
-    try:
-        while abs(((y[-1] - y[-2]) / (x[-1] - x[-2])) - expectedGradient) > 0.5:
-            x = x[:-1]
-            y = y[:-1]
-    except IndexError:
-        return None
+    for end_index in range(window_size, len(y) + 1):
+        x_values_in_window = x[end_index - window_size : end_index]
+        y_values_in_window = y[end_index - window_size : end_index]
+        slope = stats.linregress(x_values_in_window, y_values_in_window).slope
+        gradients.append(slope)
 
-    while len(x) >= 4:
-        # Best fit line
-        gradient, intercept = numpy.polyfit(numpy.array(x), numpy.array(y), 1)
+    x = x[int(window_size / 2) :]  # Remove lost values of x at the start
+    y = y[int(window_size / 2) :]  # Remove lost values of x at the start
+
+    # Now need to find longest sub-list where the gradient over the window is within 20% of target
+    best_start_index = 0
+    best_length = 0
+    for start_index in range(0, len(gradients)):
+        sub_list_length = 0
+        while (start_index + sub_list_length < len(gradients)) and (
+            0.8 * expectedGradient
+            <= gradients[start_index + sub_list_length]
+            <= 1.2 * expectedGradient
+        ):
+            sub_list_length += 1
+        if sub_list_length > best_length:
+            best_start_index = start_index
+            best_length = sub_list_length
+
+    # if expectedGradient == 3:
+    #     print(x)
+    #     print(gradients)
+    #     print(best_start_index)
+    #     print(best_length)
+
+    # Now have lists with plausible sub-section gradient
+    x = x[best_start_index : best_start_index + best_length + 1]
+    y = y[best_start_index : best_start_index + best_length + 1]
+
+    # Now confirm gradient across whole lot and trim if necessary
+    while len(x) > 4:
+        # if expectedGradient == 3:
+        #     print(x)
+        #     print(y)
+        gradient, intercept, _, _, _ = stats.linregress(x, y)
         if (
-            1 - maxErrorPercentage / 100
-        ) * expectedGradient <= gradient and gradient <= (
-            1 + maxErrorPercentage / 100
-        ) * expectedGradient:
-            # We've found a solution
+            (1 - maxErrorPercentage / 100) * expectedGradient
+            <= gradient
+            <= (1 + maxErrorPercentage / 100) * expectedGradient
+        ):
+            print("FOU*ND ONE")
             return StraightLine(round(gradient, 4), round(intercept, 4))
-
-        # Check whether the top pair or the bottom pair of datapoints
-        # have a gradient furthest from the target and discard them
-        bottomPairwiseGradient = (y[1] - y[0]) / (x[1] - x[0])
-        topPairwiseGradient = (y[-1] - y[-2]) / (x[-1] - x[-2])
-        bottomError = abs(bottomPairwiseGradient - expectedGradient)
-        topError = abs(topPairwiseGradient - expectedGradient)
-        if bottomError > topError:
-            x = x[1:]
-            y = y[1:]
         else:
-            x = x[:-1]
-            y = y[:-1]
+            # Work out slope if remove top or bottom element
+            gradient_with_lowest_removed = stats.linregress(x[1:], y[1:]).slope
+            gradient_with_highest_removed = stats.linregress(x[:-1], y[:-1]).slope
 
+            if abs(gradient_with_highest_removed - expectedGradient) < abs(
+                gradient_with_lowest_removed - expectedGradient
+            ):
+                x = x[:-1]
+                y = y[:-1]
+            else:
+                x = x[1:]
+                y = y[1:]
+
+    # Failed to find appropriate line
     return None
 
 
