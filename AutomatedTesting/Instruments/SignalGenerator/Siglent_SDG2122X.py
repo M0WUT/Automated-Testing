@@ -1,176 +1,131 @@
-# Standard library imports
-from __future__ import annotations
-
 import logging
-from typing import TYPE_CHECKING
+from typing import Tuple
 
-# Local imports
+from pyvisa import ResourceManager
+
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
     SignalGenerator,
     SignalGeneratorChannel,
+    SignalGeneratorModulation,
 )
-
-# Type checking imports
-if TYPE_CHECKING:
-    from AutomatedTesting.Instruments.TopLevel.InstrumentSupervisor import (
-        InstrumentSupervisor,
-    )
-    from pyvisa import ResourceManager
 
 
 class Siglent_SDG2122X(SignalGenerator):
     """
-    Class for Siglent 2122X
-
-    Args:
-        address (str):
-            PyVisa String e.g. "GPIB0::14::INSTR"
-            with device location
-
-    Returns:
-        None
-
-    Raises:
-        None
+    Class for Siglent SDG2122X
     """
 
-    def __init__(self, address: str, name: str = "Siglent SDG2122X"):
-
+    def __init__(
+        self,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
+        verify: bool,
+        logger: logging.Logger,
+        **kwargs,
+    ):
         channel1 = SignalGeneratorChannel(
-            channelNumber=1, maxPower=30, minPower=-60, maxFreq=120e6, minFreq=1e-6
+            channel_number=1,
+            instrument=self,
+            logger=logger,
+            max_power=30,
+            min_power=-50,
+            max_freq=120e6,
+            min_freq=1e-6,
         )
 
         channel2 = SignalGeneratorChannel(
-            channelNumber=2, maxPower=30, minPower=-60, maxFreq=120e6, minFreq=1e-6
+            channel_number=2,
+            instrument=self,
+            logger=logger,
+            max_power=30,
+            min_power=-50,
+            max_freq=120e6,
+            min_freq=1e-6,
         )
 
         super().__init__(
-            id="Siglent Technologies,SDG2122X,SDG2XCAX5R0800,2.01.01.35R3B2",
+            resource_manager=resource_manager,
+            visa_address=visa_address,
             name=name,
-            channelCount=2,
+            expected_idn_response=expected_idn_response,
+            verify=verify,
+            channel_count=2,
             channels=[channel1, channel2],
-            address=address,
+            logger=logger,
+            **kwargs,
         )
 
-    #################################
-    # Inheritied function overrides #
-    #################################
+    def get_instrument_errors(self):
+        return []  # Doesn't appear to be implemented in the device
 
-    def initialise(
-        self, resourceManager: ResourceManager, supervisor: InstrumentSupervisor
-    ):
-        super().initialise(resourceManager, supervisor)
-        self.set_output_load_50R()
-        self.set_wavetype_sine()
+    def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
+        return []  # Doesn't appear to be implemented in the device
 
-    def enable_channel_output(self, channelNumber: int, enabled: bool):
-        """
-        Enables / Disables channel output
+    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
+        self._write(f"C{channel_number}:OUTP {'ON' if enabled else 'OFF'}")
 
-        Args:
-            channelNumber (int): Power Supply Channel Number
-            enabled (bool): 0 = Disable output, 1 = Enable output
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If enabled is not 0/1 or True/False
-        """
-        assert isinstance(enabled, bool)
-        if enabled:
-            self._write(f"C{channelNumber}:OUTP ON")
-        else:
-            self._write(f"C{channelNumber}:OUTP OFF")
-        assert self.get_channel_output_status(channelNumber) == enabled
-
-    def get_channel_output_status(self, channelNumber: int) -> bool:
-        response = self._query(f"C{channelNumber}:OUTP?")
+    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
+        response = self._query(f"C{channel_number}:OUTP?")
         state = response.split("OUTP ")[1].split(",")[0]
         return state == "ON"
 
-    def set_channel_power(self, channelNumber: int, power: float):
-        """
-        Sets output power on requested channel
+    def set_channel_power(self, channel_number: int, power: float):
+        self._write(f"C{channel_number}:BSWV AMPDBM,{power}")
 
-        Args:
-            channelNumber (int): Power Supply Channel Number
-            power (float): Output power in dBm
+    def get_channel_power(self, channel_number: int) -> float:
+        channel_status = self._query(f"C{channel_number}:BSWV?")
+        try:
+            return float(channel_status.split("AMPDBM,")[1].split("d")[0])
+        except IndexError:
+            # Asked for power in dBm into Hi-Z load
+            self.logger.warning("Requested power reading when set to Hi-Z load")
+            return -174
 
-        Returns:
-            None
+    def set_channel_freq(self, channel_number: int, freq: float):
+        self._write(f"C{channel_number}:BSWV FRQ,{freq}")
 
-        Raises:
-            None
-        """
-        self._write(f"C{channelNumber}:BSWV AMPDBM,{power}")
-
-    def read_channel_power(self, channelNumber: int):
-        """
-        Reads output power on requested channel
-
-        Args:
-            channelNumber (int): Power Supply Channel Number
-
-        Returns:
-            float: Channel output power in dBm
-
-        Raises:
-            None
-        """
-        channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        return float(channelStatus.split("AMPDBM,")[1].split("d")[0])
-
-    def set_channel_freq(self, channelNumber: int, freq: int):
-        assert round(freq) == freq, "Frequency must be integer number of Hz"
-        self._write(f"C{channelNumber}:BSWV FRQ,{int(freq)}")
-
-    def read_channel_freq(self, channelNumber: int):
-        channelStatus = self._query(f"C{channelNumber}:BSWV?")
-        freq = float(channelStatus.split("FRQ,")[1].split("HZ")[0])
+    def get_channel_freq(self, channel_number: int) -> float:
+        channel_status = self._query(f"C{channel_number}:BSWV?")
+        freq = float(channel_status.split("FRQ,")[1].split("HZ")[0])
         return freq
 
-    def set_channel_modulation(self, channelNumber: int, modulation: str):
-        raise NotImplementedError  # pragma: no cover
+    def set_channel_modulation(
+        self, channel_number: int, modulation: SignalGeneratorModulation
+    ):
+        if modulation == SignalGeneratorModulation.NONE:
+            self._write(f"C{channel_number}:BSWV WVTP SINE")
+        else:
+            raise NotImplementedError
 
-    def read_channel_modulation(self, channelNumber: int):
-        raise NotImplementedError  # pragma: no cover
+    def get_channel_modulation(self, channel_number: int) -> SignalGeneratorModulation:
+        channel_status = self._query(f"C{channel_number}:BSWV?")
+        modulation = channel_status.split(",")[1]
+        if modulation == "SINE":
+            return SignalGeneratorModulation.NONE
+        else:
+            raise NotImplementedError
 
-    def read_instrument_errors(self):
-        """
-        Checks whole instrument for errors
+    def set_channel_load_impedance(self, channel_number: int, impedance: float):
+        if impedance == float("inf"):
+            self._write(f"C{channel_number}:OUTP LOAD,HZ")
+        else:
+            assert isinstance(impedance, int)
+            self._write(f"C{channel_number}:OUTP LOAD,{impedance}")
 
-        Args:
-            None
+    def get_channel_load_impedance(self, channel_number: int) -> float:
+        response = self._query(f"C{channel_number}:OUTP?")
+        impedance = response.split(",")[2]
+        if impedance == "HZ":
+            return float("inf")
+        else:
+            return float(impedance)
 
-        Returns:
-            list(Tuple): Pairs of (status code, error message)
+    def set_channel_vpp(self, channel_number: int, voltage: float):
+        self._write(f"C{channel_number}:BSWV AMP,{voltage}")
 
-        Raises:
-            None
-        """
-        return []
-
-    def check_channel_errors(self, channelNumber: int):
-        # No channel specific errors
-        pass
-
-    def reserve_channel(self, *args, **kwargs) -> SignalGeneratorChannel:
-        return super().reserve_channel(*args, **kwargs)
-
-    #############################
-    # Device specific functions #
-    #############################
-
-    def set_output_load_50R(self):
-        # Set all calculations to be in 50 ohm mode
-        self._write("C1:OUTP LOAD,50")
-        self._write("C2:OUTP LOAD,50")
-
-    def set_output_load_hiz(self):
-        self._write("C1:OUTP LOAD,HZ")
-        self._write("C2:OUTP LOAD,HZ")
-
-    def set_wavetype_sine(self):
-        self._write("C1:BSWV WVTP SINE")
-        self._write("C2:BSWV WVTP SINE")
+    def get_channel_vpp(self, channel_number: int) -> float:
+        channel_status = self._query(f"C{channel_number}:BSWV?")
+        vpp = float(channel_status.split("AMP,")[1].split("V,AMP")[0])
+        return vpp

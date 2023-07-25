@@ -1,153 +1,107 @@
 import logging
+from enum import Enum, auto
+from typing import List, Tuple
 
-from AutomatedTesting.Instruments.TopLevel.MultiChannelInstrument import (
+from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+from AutomatedTesting.Instruments.MultichannelInstrument import (
     InstrumentChannel,
-    MultiChannelInstrument,
+    MultichannelInstrument,
 )
-from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
+from AutomatedTesting.Misc.UsefulFunctions import readable_freq
+
+
+class SignalGeneratorModulation(Enum):
+    NONE = auto()
+    AM = auto()
+    FM = auto()
+    PM = auto()
 
 
 class SignalGeneratorChannel(InstrumentChannel):
-    """
-    Object containing properties of Signal Generator Output channel
-
-    Args:
-        instrument (SignalGenerator): Signal Generator to
-            which that channel belongs
-        channelNumber (int): Channel Number on Signal Generator
-        maxPower (float): Maximum Output Power (in dBm)
-        minPower (float): Minimum Output Power (in dBm)
-        maxFreq (int): Maximum Carrier Frequency (in Hz)
-        minFreq (int): Minimum Carrier Frequency (in Hz)
-
-    Attributes:
-        instrument (SignalGenerator): Signal Generator to which
-            this channel belongs
-        reserved (bool): True if something has reserved control of this channel
-        name (str): Name of the purpose that has this channel reserved
-            None if self.reserved = False
-        errorThread (Thread): When output is enabled, checks to ensure
-            that no errors have occured
-
-    Returns:
-        None
-
-    Raises:
-        ValueError: If Max Power < Min Power, Max Freq < Min Freq
-            or channelNumber > max channels for that Signal Generator
-    """
-
     def __init__(
         self,
-        channelNumber: int,
-        maxPower: float,
-        minPower: float,
-        maxFreq: int,
-        minFreq: int,
+        channel_number: int,
+        instrument: BaseInstrument,
+        logger: logging.Logger,
+        max_power: float,  # in dBm
+        min_power: float,
+        max_freq: float,  # in Hz
+        min_freq: float,
     ):
+        super().__init__(channel_number, instrument, logger)
 
-        if maxPower < minPower:
+        # Save channel limits for power - Two limits as we
+        # can set soft limits later
+        if min_power > max_power:
             raise ValueError
-        self.absoluteMaxPower = maxPower
-        self.absoluteMinPower = minPower
-        self.maxPower = self.absoluteMaxPower
-        self.minPower = self.absoluteMinPower
+        self.absolute_max_power = self.max_power = max_power
+        self.absolute_min_power = self.min_power = min_power
 
-        if maxFreq < minFreq:
+        # Save channel limits for frequency
+        if min_freq > max_freq:
             raise ValueError
-        self.absoluteMaxFreq = maxFreq
-        self.absoluteMinFreq = minFreq
-        self.maxFreq = self.absoluteMaxFreq
-        self.minFreq = self.absoluteMinFreq
-        self.outputEnabled = False
+        self.absolute_max_freq = self.max_freq = max_freq
+        self.absolute_min_freq = self.min_freq = min_freq
 
-        self.freqSetpoint = None
-        self.powerSetpoint = None
-
-        super().__init__(channelNumber)
-
-    def _free(self):
-        """
-        Removes the reservation on this power supply channel
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If this channel is not already reserved
-        """
-        super()._free()
-        self.maxPower = self.absoluteMaxPower
-        self.minPower = self.absoluteMinPower
-        self.maxFreq = self.absoluteMaxFreq
-        self.minFreq = self.absoluteMinFreq
-
-    def set_power_limits(self, minPower: float, maxPower: float):
+    def set_soft_power_limits(self, min_power, max_power):
         """
         Allows tighter limits to be set on power than imposed by
         the instrument.
 
         Args:
-            minPower (float): Minimum allowed power in dBm
-            maxPower (float): Maximum allowed power in dBm
-
+            min_power (float): Minimum allowed power in dBm
+            max_power (float): Maximum allowed power in dBm
         Returns:
             None
-
         Raises:
             ValueError: If requested limits are outside
                 instrument limits
         """
-        if (maxPower > self.absoluteMaxPower) or (minPower < self.absoluteMinPower):
-            logging.error(
-                f"{self.instrument.name}, "
-                f"Channel {self.channelNumber} "
-                f"requested power limits ({minPower}dBm - {maxPower}dBm) "
+        if (max_power > self.absolute_max_power) or (
+            min_power < self.absolute_min_power
+        ):
+            self.logger.error(
+                f"{self.name}, "
+                f"requested power limits ({min_power}dBm - {max_power}dBm) "
                 f" are outside channel limits "
-                f"({self.absoluteMinPower}dBm - {self.absoluteMaxPower}dBm)"
+                f"({self.absolute_min_power}dBm - {self.absolute_max_power}dBm)"
             )
             raise ValueError
 
         # We already know that requested limits are harsher / equal
         # to instrument limits so just use those
-        self.maxPower = maxPower
-        self.minPower = minPower
+        self.max_power = max_power
+        self.min_power = min_power
 
-    def set_freq_limits(self, minFreq: int, maxFreq: int):
+    def set_freq_limits(self, min_freq: float, max_freq: float):
         """
         Allows tighter limits to be set on frequency than imposed by
         the instrument.
 
         Args:
-            minFreq: Minimum allowed frequency in Hz
-            maxFreq: Maximum allowed frequency in Hz
-
+            min_freq: Minimum allowed frequency in Hz
+            max_freq: Maximum allowed frequency in Hz
         Returns:
             None
-
         Raises:
             ValueError: If requested limits are outside
                 instrument limits
         """
-        if (maxFreq > self.absoluteMaxFreq) or (minFreq < self.absoluteMinFreq):
-            logging.error(
-                f"{self.instrument.name}, "
-                f"Channel {self.channelNumber} "
-                f"requested frequency limits ({readable_freq(minFreq)} - "
-                f"{readable_freq(maxFreq)}) "
+        if (max_freq > self.absolute_max_freq) or (min_freq < self.absolute_min_freq):
+            self.logger.error(
+                f"{self.name}"
+                f"requested frequency limits ({readable_freq(min_freq)} - "
+                f"{readable_freq(max_freq)}) "
                 f" are outside channel limits "
-                f"({readable_freq(self.absoluteMinFreq)} - "
-                f"{readable_freq(self.absoluteMaxFreq)})"
+                f"({readable_freq(self.absolute_min_freq)} - "
+                f"{readable_freq(self.absolute_max_freq)})"
             )
             raise ValueError
 
         # We already know that requested limits are harsher / equal
         # to instrument limits so just use those
-        self.maxFreq = maxFreq
-        self.minFreq = minFreq
+        self.max_freq = max_freq
+        self.min_freq = min_freq
 
     def set_power(self, power):
         """
@@ -155,162 +109,225 @@ class SignalGeneratorChannel(InstrumentChannel):
 
         Args:
             power (float): desired output power in dBm
-
         Returns:
             None
-
         Raises:
             ValueError: If requested power is outside channel
                 max/min power
-            AssertionError: If readback power != requested power
+            AssertionError: If verified power != requested power
         """
-        if power != self.powerSetpoint:
-            if self.minPower <= power <= self.maxPower:
-                self.instrument.set_channel_power(self.channelNumber, power)
-                x = self.read_power()
-                assert round(x, 2) == round(power, 2), (
-                    f"{self.instrument.name}, "
-                    f"Channel {self.get_name()} failed to set power to "
-                    f"{power}dBm. Readback value: {x}dBm"
-                )
+        power = round(power, 1)
+        assert self.get_load_impedance() == 50
+        if (power < self.min_power) or (power > self.max_power):
+            raise ValueError(f"Unable to set {self.name} to {power}dBm")
+        self.instrument.set_channel_power(self.channel_number, power)
+        if self.instrument.verify:
+            readbackPower = self.get_power()
+            assert readbackPower == power
+        self.logger.debug(f"{self.name} set to {power} dBm")
 
-                self.powerSetpoint = power
-            else:
-                raise ValueError(
-                    f"Requested power of {power}dBm outside limits for "
-                    f"{self.instrument.name}, "
-                    f"Channel {self.channelNumber}"
-                )
-
-        logging.debug(
-            f"{self.instrument.name}, " f"{self.get_name()} set to {power}dBm"
-        )
-
-    def read_power(self):
+    def get_power(self) -> float:
         """
-        Reads channel output power
+        Reads channel output power setpoint
 
         Args:
             None
-
         Returns:
-            power (float): channel output power in dBm
-
+            float: channel output power setpoint in dBm
         Raises:
             None
         """
-        return self.instrument.read_channel_power(self.channelNumber)
+        assert self.get_load_impedance() == 50
+        return self.instrument.get_channel_power(self.channel_number)
 
-    def set_freq(self, freq: int):
+    def set_freq(self, freq):
         """
-        Sets channel carrier frequency
+        Sets channel output frequency
 
         Args:
-            freq (float): frequency in Hz
-
+            freq (float): desired output frequency in Hz
         Returns:
             None
-
         Raises:
             ValueError: If requested frequency is outside channel
                 max/min frequency
-            AssertionError: If readback frequency != requested frequency
+            AssertionError: If verified frequency != requested frequency
         """
-        if freq != self.freqSetpoint:
-            if self.minFreq <= freq <= self.maxFreq:
-                self.instrument.set_channel_freq(self.channelNumber, freq)
-                x = self.read_freq()
-                if x != freq:
-                    logging.error(
-                        f"{self.instrument.name}, "
-                        f"Channel {self.get_name()} failed to set frequency to "
-                        f"{readable_freq(freq)}. "
-                        f"Readback value: {readable_freq(x)}"
-                    )
+        if self.min_freq <= freq <= self.max_freq:
+            self.instrument.set_channel_freq(self.channel_number, freq)
+            if self.instrument.verify:
+                readbackFreq = self.get_freq()
+                assert readbackFreq == freq
+            self.logger.debug(f"{self.name} set to {readable_freq(freq)}")
 
-                logging.debug(
-                    f"{self.instrument.name}, "
-                    f"Channel {self.get_name()} set to {readable_freq(freq)}"
-                )
-                self.freqSetpoint = freq
-            else:
-                raise ValueError(
-                    f"Requested freq of {readable_freq(freq)} outside limits "
-                    f"for {self.instrument.name}, "
-                    f"Channel {self.channelNumber}"
-                )
-
-    def read_freq(self) -> int:
+    def get_freq(self) -> float:
         """
-        Reads channel frequency
+        Reads channel output frequency
 
         Args:
             None
-
         Returns:
-            freq (int): Channel frequency in Hz
-
+            float: channel output frequency in Hz
         Raises:
             None
         """
-        return self.instrument.read_channel_freq(self.channelNumber)
+        return self.instrument.get_channel_freq(self.channel_number)
+
+    def set_modulation(self, modulation: SignalGeneratorModulation):
+        """
+        Sets channel modulation type
+
+        Args:
+            modulation (SignalGeneratorModulation): modulation type
+        Returns:
+            None
+        Raises:
+            AssertionError: If verified modulation != requested modulation
+        """
+        self.instrument.set_channel_modulation(self.channel_number, modulation)
+        if self.instrument.verify:
+            assert self.get_modulation() == modulation
+        self.logger.debug(f"{self.name} set modulation type to {modulation}")
+
+    def get_modulation(self) -> SignalGeneratorModulation:
+        """
+        Returns channel's modulation type
+
+        Args:
+            None
+        Returns:
+            modulation (SignalGeneratorModulation): modulation type
+        Raises:
+            None
+        """
+        return self.instrument.get_channel_modulation(self.channel_number)
+
+    def set_load_impedance(self, impedance: float):
+        """
+        Sets channel load impedance
+
+        Args:
+            impedance (float): load impedance in Ohms.
+                Set to float('inf') for Hi-Z
+        Returns:
+            None
+        Raises:
+            AssertionError: If verified impedance != requested impedance
+        """
+        self.instrument.set_channel_load_impedance(self.channel_number, impedance)
+        if self.instrument.verify:
+            assert self.get_load_impedance() == impedance
+
+    def get_load_impedance(self) -> float:
+        """
+        Returns channel load impedance in Ohms
+
+        Args:
+            None
+        Returns:
+            float: Load impedance in Ohms
+        Raises:
+            None
+        """
+        return self.instrument.get_channel_load_impedance(self.channel_number)
+
+    def set_vpp(self, voltage: float):
+        """
+        Sets channel output amplitude in Vpp
+
+        Args:
+            voltage(float): peak-to-peak voltage in V
+        Returns:
+            None
+        Raises:
+            AssertionError: If verified voltage != requested voltage
+        """
+        assert self.get_load_impedance() == float("inf")
+        self.instrument.set_channel_vpp(self.channel_number, voltage)
+        if self.instrument.verify:
+            assert self.get_vpp() == voltage
+
+    def get_vpp(self) -> float:
+        """
+        Returns channel output amplitude in Vpp
+
+        Args:
+            None
+        Returns:
+            Output peak-to-peak voltage in V
+        Raises:
+            None
+        """
+        assert self.get_load_impedance() == float("inf")
+        return self.instrument.get_channel_vpp(self.channel_number)
 
 
-class SignalGenerator(MultiChannelInstrument):
+class SignalGenerator(MultichannelInstrument):
     """
     Pure virtual class for Signal Generators
     This should never be implemented directly
-
-    Args:
-        name (str): Identifying string for signal generator
-        address (str):
-            PyVisa String e.g. "GPIB0::14::INSTR"
-            with device location
-        channelCount (int): Number of seperate output channels
-        channels (List[SignalGeneratorChannel]): List of Signal Generator's
-            output channels
-        **kwargs: Passed to PyVisa Address field
-
-    Returns:
-        None
-
-    Raises:
-        TypeError: If resourceManager is not a valid PyVisa
-            Resource Manager
-        ValueError: If Resource Manager fails to open device
-        AssertionError: If channel has ID greater than Signal Generator channel
-            count
+    The functions listed below should all be overwritten by the child
+    class with the possible exception of enter and get_instrument_errors
     """
 
-    def __init__(self, id, name, channelCount, channels, address, **kwargs):
-        super().__init__(address, id, name, channelCount, channels, **kwargs)
+    def reserve_channel(
+        self, channel_number: int, purpose: str
+    ) -> SignalGeneratorChannel:
+        return super().reserve_channel(channel_number, purpose)
 
-    def initialise(self, resourceManager, supervisor):
-        super().initialise(resourceManager, supervisor)
-        for x in self.channels:
-            x.enable_output(False)
-        logging.info(f"{self.name} initialised")
+    def __enter__(self):
+        self.initialise()
 
-    def enable_channel_output(self, channelNumber, enabled):
+    def initialise(self):
+        super().initialise()
+        if self.only_software_control:
+            for x in self.channels:
+                x.set_load_impedance(50)
+                x.set_modulation(SignalGeneratorModulation.NONE)
+                x.set_freq(x.min_freq)
+                x.set_power(x.min_power)
+        return self
+
+    def get_instrument_errors(self) -> List[Tuple[int, str]]:
+        return super().get_instrument_errors()
+
+    def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
         raise NotImplementedError  # pragma: no cover
 
-    def check_channel_errors(self, channelNumber):
+    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_power(self, channelNumber, power):
+    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
         raise NotImplementedError  # pragma: no cover
 
-    def read_channel_power(self, channelNumber):
+    def set_channel_power(self, channel_number: int, power: float):
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_freq(self, channelNumber, freq):
+    def get_channel_power(self, channel_number: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
-    def read_channel_freq(self, channelNumber):
+    def set_channel_frequency(self, channel_number: int, freq: float):
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_modulation(self, channelNumber, modulation):
+    def get_channel_freq(self, channel_number: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
-    def read_channel_modulation(self, channelNumber):
+    def set_channel_modulation(
+        self, channel_number: int, modulation: SignalGeneratorModulation
+    ):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_channel_modulation(self, channel_number: int) -> SignalGeneratorModulation:
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_load_impedance(self, channel_number: int, impedance: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_channel_load_impedance(self, channel_number: int) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def set_channel_vpp(self, channel_number: int, voltage: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_channel_vpp(self, channel_number) -> float:
         raise NotImplementedError  # pragma: no cover

@@ -4,13 +4,14 @@
 
 ## Requirements
 
-* Install pre-requisites (Based on https://xdevs.com/guide/ni_gpib_rpi/)
+* Install pre-requisites (Based on https://github.com/RPi-Distro/rpi-source)
 ```
-sudo apt install fxload bc bison flex libssl-dev libncurses5-dev
+sudo apt install git bc bison flex libssl-dev
 ```
 *Get rpi-source
 ```
-wget https://raw.githubusercontent.com/notro/rpi-source/master/rpi-source -O /usr/bin/rpi-source && sudo chmod +x /usr/bin/rpi-source && /usr/bin/rpi-source -q --tag-update
+sudo wget https://raw.githubusercontent.com/RPi-Distro/rpi-source/master/rpi-source -O /usr/local/bin/rpi-source && sudo chmod +x /usr/local/bin/rpi-source && /usr/local/bin/rpi-source -q --tag-update
+
 ```
 
 *Run rpi-source

@@ -1,275 +1,188 @@
-import logging
-from abc import ABC, abstractmethod
 from enum import Enum, auto
-from time import sleep
-from typing import Optional
+from logging import Logger
+from typing import List, Tuple
 
-from AutomatedTesting.Instruments.TopLevel.BaseInstrument import BaseInstrument
-from AutomatedTesting.Instruments.TopLevel.UsefulFunctions import readable_freq
-from pyvisa import VisaIOError
+from pyvisa import ResourceManager
 
-
-class DetectorMode(Enum):
-    RMS = auto()
-    VIDEO = auto()
+from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 
 
-class SpectrumAnalyser(BaseInstrument):
+class SpectrumAnalyser(EntireInstrument):
+    class SweepMode(Enum):
+        SINGLE = auto()
+        CONTINUOUS = auto()
+
     def __init__(
         self,
-        address: str,
-        id: str,
+        resource_manager: ResourceManager,
+        visa_address: str,
         name: str,
-        minFreq: int,
-        maxFreq: int,
-        minSweepPoints: Optional[int],
-        maxSweepPoints: Optional[int],
-        minSpan: int,
-        maxSpan: int,
-        hasPreamp: bool,
+        expected_idn_response: str,
+        verify: bool,
+        logger: Logger,
+        min_freq: int,
+        max_freq: int,
+        min_sweep_points: int,
+        max_sweep_points: int,
+        min_span: int,  # Note this is ignoring zero span
+        max_span: int,
+        min_attenuation: float,
+        max_attenuation: float,
+        has_preamp: bool,
         **kwargs,
     ):
         """
         Pure virtual class for Spectrum Analyser
         This should never be implemented directly
-
-        Args:
-            address (str):
-                PyVisa String e.g. "GPIB0::14::INSTR"
-                with device location
-            id (str): Expected string when ID is queried
-            name (str): Identifying string for power supply
-            minFreq (float): minimum operational frequency in Hz
-            maxFreq (float): maximum operational frequency in Hz
-            **kwargs: ed to PyVisa Address field
-
-        Returns:
-            None
-
-        Raises:
-            None
         """
-        self.minFreq = minFreq
-        self.maxFreq = maxFreq
-        self.minSweepPoints = minSweepPoints
-        self.maxSweepPoints = maxSweepPoints
-        self.minSpan = minSpan
-        self.maxSpan = maxSpan
-        self.hasPreamp = hasPreamp
-        super().__init__(address, id, name, **kwargs)
-
-    def initialise(self, *args, **kwargs):
-        super().initialise(*args, **kwargs)
-        self._write(":INIT:CONT 0")
-        logging.info(f"{self.name} initialised")
-
-    def cleanup(self):
-        self.set_input_attenuator(10)
-        if self.hasPreamp:
-            self.disable_preamp()
-        self.disable_averaging()
-        self._write(":INIT:CONT 1")
-        super().cleanup()
-
-    def set_centre_freq(self, freq):
-        """
-        Sets centre frequency
-
-        Args:
-           freq (float): Frequency in Hz
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If requested freq is outside instrument limits
-        """
-        if not (self.minFreq <= freq <= self.maxFreq):
+        super().__init__(
+            resource_manager=resource_manager,
+            visa_address=visa_address,
+            name=name,
+            expected_idn_response=expected_idn_response,
+            verify=verify,
+            logger=logger,
+            **kwargs,
+        )
+        if (
+            max_freq < min_freq
+            or max_sweep_points < min_sweep_points
+            or max_span < min_span
+        ):
             raise ValueError
-        self._write(f"FREQ:CENT {readable_freq(freq)}")
-        if self.verify:
-            assert self.read_centre_freq() == freq
-        logging.debug(f"{self.name} set centre frequency to {readable_freq(freq)}")
+        self.min_freq = min_freq
+        self.max_freq = max_freq
+        self.min_sweep_points = min_sweep_points
+        self.max_sweep_points = max_sweep_points
+        self.min_span = min_span
+        self.max_span = max_span
+        self.min_attenuation = min_attenuation
+        self.max_attenuation = max_attenuation
+        self.has_preamp = has_preamp
+        self.supported_rbw = []
+        self.supported_vbw = []
+        self.max_markers = 8
 
-    def read_centre_freq(self) -> float:
-        """
-        Returns centre frequency
+    def __enter__(self):
+        super().__enter__()
+        self.set_sweep_mode(self.SweepMode.SINGLE)
 
-        Args:
-           None
+    def __exit__(self, *args, **kwargs):
+        self.set_sweep_mode(self.SweepMode.CONTINUOUS)
+        super().__exit__(*args, **kwargs)
 
-        Returns:
-            float: centre freq in Hz
-
-        Raises:
-            None
-        """
-        return float(self._query("FREQ:CENT?"))
-
-    def set_start_freq(self, freq):
+    def set_start_freq(self, freq: float):
         """
         Sets start frequency
 
         Args:
-           freq (float): Frequency in Hz
+            freq (float): Start Frequency in Hz
 
         Returns:
             None
 
         Raises:
-            ValueError: If requested freq is outside instrument limits
+            ValueError: If <freq> is outside min_freq -> max_freq
+            AssertionError: If readback value doesn't match requested
         """
-        if not (self.minFreq <= freq <= self.maxFreq):
-            raise ValueError
-        self._write(f"FREQ:STAR {readable_freq(freq)}")
-        if self.verify:
-            assert self.read_start_freq() == freq
-        logging.debug(f"{self.name} set start frequency to {readable_freq(freq)}")
+        raise NotImplementedError  # pragma: no cover
 
-    def read_start_freq(self) -> int:
+    def get_start_freq(self) -> float:
         """
-        Returns start frequency
+        Reads start frequency
 
         Args:
-           None
+            None
 
         Returns:
-            float: Start frequency in Hz
+            float: Start Frequency in Hz
 
         Raises:
             None
         """
-        return float(self._query("FREQ:STAR?"))
+        raise NotImplementedError  # pragma: no cover
 
-    def set_stop_freq(self, freq):
+    def set_stop_freq(self, freq: float):
         """
         Sets stop frequency
 
         Args:
-           freq (float): Frequency in Hz
+            freq (float): Stop Frequency in Hz
 
         Returns:
             None
 
         Raises:
-            ValueError: If requested freq is outside instrument limits
+            ValueError: If <freq> is outside min_freq -> max_freq
+            AssertionError: If readback value doesn't match requested
         """
-        if not (self.minFreq <= freq <= self.maxFreq):
-            raise ValueError
-        self._write(f"FREQ:STOP {readable_freq(freq)}")
-        if self.verify:
-            assert self.read_stop_freq() == freq
-        logging.debug(f"{self.name} set stop frequency to {readable_freq(freq)}")
+        raise NotImplementedError  # pragma: no cover
 
-    def read_stop_freq(self) -> float:
+    def get_stop_freq(self) -> float:
         """
-        Returns stop frequency
+        Reads stop frequency
 
         Args:
-           None
+            None
 
         Returns:
-            float: Stop frequency in Hz
+            float: Stop Frequency in Hz
 
         Raises:
             None
         """
-        return float(self._query("FREQ:STOP?"))
+        raise NotImplementedError  # pragma: no cover
 
-    def set_span(self, span):
+    def set_centre_freq(self, freq: float):
         """
-        Sets x axis span
+        Sets centre frequency
 
         Args:
-           span (float): Span in Hz
+            freq (float): Centre Frequency in Hz
 
         Returns:
             None
 
         Raises:
-            ValueError: If frequested span is not allowed
+            ValueError: If <freq> is outside min_freq -> max_freq
+            AssertionError: If readback value doesn't match requested
         """
-        if not (self.minSpan <= span <= self.maxSpan or span == 0):
-            raise ValueError
-        self._write(f"FREQ:SPAN {readable_freq(span)}")
-        if self.verify:
-            assert self.read_span() == span
-        logging.debug(f"{self.name} set span to {readable_freq(span)}")
+        raise NotImplementedError  # pragma: no cover
 
-    def read_span(self) -> int:
+    def get_centre_freq(self) -> float:
         """
-        Returns x-axis span
+        Reads centre frequency
 
         Args:
-           span (float): Span in Hz
+            None
 
         Returns:
-            None
+            float: centre Frequency in Hz
 
         Raises:
             None
         """
-        return float(self._query("FREQ:SPAN?"))
+        raise NotImplementedError  # pragma: no cover
 
-    def set_sweep_points(self, numPoints):
+    def set_span(self, span: float):
         """
-        Sets Number of Points in sweep
+        Sets span
 
         Args:
-           numPoints (int): Number of sweep points
+            freq (float): Span in Hz
 
         Returns:
             None
 
         Raises:
-            None
+            ValueError: If <span> is outside min_span -> max_span
+            AssertionError: If readback value doesn't match requested
         """
-        if not self.minSweepPoints:
-            logging.warning(
-                f"{self.name} does not allow setting of number of sweep points. Ignoring command"
-            )
-        else:
-            if not (self.minSweepPoints <= numPoints <= self.maxSweepPoints):
-                raise ValueError
-            self._write(f":SWE:POIN {numPoints}")
-            if self.verify:
-                assert self.read_sweep_points() == numPoints
-            logging.debug(f"{self.name} set number of points to {numPoints}")
+        raise NotImplementedError  # pragma: no cover
 
-    def read_sweep_points(self) -> int:
-        assert self.minSweepPoints
-        return int(self._query(":SWE:POIN?"))
-
-    def set_sweep_time(self, sweepTime):
+    def set_zero_span(self):
         """
-        Sets Sweep time in ms
-
-        Args:
-           sweepTime (float): sweep time in ms, or "auto"
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if sweepTime == "auto":
-            self._write(":SWE:TIME:AUTO ON")
-        else:
-            self._write(f":SWE:TIME {sweepTime}ms")
-            if self.read_sweep_time() != sweepTime:
-                raise ValueError
-            logging.debug(f"{self.name} set sweep time to {sweepTime}ms")
-
-    def read_sweep_time(self) -> float:
-        """
-        Returns sweep time in ms
-        """
-        return 1000.0 * float(self._query(":SWE:TIME?"))
-
-    def enable_preamp(self) -> None:
-        """
-        Enables the RF preamp
+        Puts spectrum analyser in zero span mode
 
         Args:
             None
@@ -278,51 +191,225 @@ class SpectrumAnalyser(BaseInstrument):
             None
 
         Raises:
-            None
+            AssertionError: If readback span isn't zero
         """
-        assert self.hasPreamp
-        self.set_preamp_state(True)
-        if self.verify:
-            assert self.read_preamp_state()
+        raise NotImplementedError  # pragma: no cover
 
-    def disable_preamp(self) -> None:
+    def get_span(self) -> float:
         """
-        Disables the RF preamp
+        Reads span
 
         Args:
             None
 
         Returns:
-            None
+            float: Span in Hz
 
         Raises:
             None
         """
-        assert self.hasPreamp
-        self.set_preamp_state(False)
-        if self.verify:
-            assert not self.read_preamp_state()
+        raise NotImplementedError  # pragma: no cover
 
-    def set_ref_level(self, power: float) -> None:
+    def set_rbw(self, rbw: float):
         """
-        Sets amplitude reference
+        Sets Resolution Bandwidth (RBW)
 
         Args:
-            power (float): Reference Level in dBm
+            rbw (float): RBW in Hz
 
         Returns:
             None
 
         Raises:
+            ValueError: If requested RBW isn't in supported list
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_rbw(self) -> float:
+        """
+        Reads Resolution Bandwidth (RBW)
+
+        Args:
+            None
+
+        Returns:
+            float: RBW in Hz
+
+        Raises:
             None
         """
-        self._write(f":DISP:WINDow:TRAC:Y:RLEV {power}")
-        if self.verify:
-            assert self.read_ref_level() == power
+        raise NotImplementedError  # pragma: no cover
 
-    def read_ref_level(self) -> float:
+    def set_vbw(self, vbw: float):
         """
-        Returns amplitude reference
+        Sets Video Bandwidth (VBW)
+
+        Args:
+            vbw (float): VBW in Hz
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested RBW isn't in supported list
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_vbw(self) -> float:
+        """
+        Reads Video Bandwidth (VBW)
+
+        Args:
+            None
+
+        Returns:
+            float: VBW in Hz
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_vbw_rbw_ratio(self, ratio: float):
+        """
+        Sets Video Bandwidth to Resolution Bandwidth ratio
+
+        Args:
+            ratio (float): desired VBW:RBW ratio
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested value isn't in supported list
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_vbw_rbw_ratio(self) -> float:
+        """
+        Reads Video Bandwidth to Resolution Bandwidth ratio
+
+        Args:
+            None
+
+        Returns:
+            float: ratio
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_sweep_mode(self, mode: SweepMode = SweepMode.CONTINUOUS):
+        """
+        Sets analyser into continuous or single sweep mode
+
+        Args:
+            mode(SweepMode): Mode to set the analyser to
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_sweep_mode(self) -> SweepMode:
+        """
+        Returns Sweep mode of the analyser
+
+        Args:
+            None
+
+        Returns:
+            SweepMode: Mode the analyser is in
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_sweep_points(self, num_points: int):
+        """
+        Sets number of sweep points
+        Args:
+            num_points (int): number of points in the sweep
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_sweep_points(self) -> int:
+        """
+        Reads number of sweep points
+
+        Args:
+            None
+
+        Returns:
+            int: number of sweep points
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_input_attenuation(self, attenuation: float):
+        """
+        Sets input attenuation
+
+        Args:
+            attenuation (float): attenuation in dB
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested value
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_input_attenuation(self) -> float:
+        """
+        Reads input attenuation
+
+        Args:
+            None
+
+        Returns:
+            float: input attenuation in dB
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_ref_level(self, level: float):
+        """
+        Sets Reference Level
+
+        Args:
+            level (float): reference level in dBm
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If readback value doesn't match requested value
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_ref_level(self) -> float:
+        """
+        Reads input attenuation
 
         Args:
             None
@@ -333,105 +420,9 @@ class SpectrumAnalyser(BaseInstrument):
         Raises:
             None
         """
-        return float(self._query(":DISP:WINDow:TRAC:Y:RLEV?"))
+        raise NotImplementedError  # pragma: no cover
 
-    def set_ampl_scale(self, dBperDiv: float) -> None:
-        """
-        Sets y-axis scale
-
-        Args:
-            dBperDiv (float): dB per division
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If requested value is out of allowed range
-            AssertionError: If readback value is incorrect
-        """
-        if not 0.1 <= dBperDiv <= 20:
-            raise ValueError
-
-        self._write(f":DISP:WINDow:TRAC:Y:PDIV {dBperDiv}")
-        if self.verify:
-            assert self.read_ampl_scale() == dBperDiv
-
-    def read_ampl_scale(self) -> float:
-        """
-        Reads y-axis scale
-
-        Args:
-            None
-
-        Returns:
-            float: Y-axis scale in dB per division
-
-        Raises:
-            None
-        """
-        return float(self._query(":DISP:WINDow:TRAC:Y:PDIV?"))
-
-    def set_input_attenuator(self, att: float) -> None:
-        """
-        Sets input attenuation
-
-        Args:
-            att (float): attenuation in dB
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If requested value is out of allowed range
-            AssertionError: If readback value is incorrect
-        """
-        self._write(f":POW:ATT {att}")
-        if self.verify:
-            assert self.read_input_attenuator() == att
-
-    def read_input_attenuator(self) -> float:
-        """
-        Reads input attenuation
-
-        Args:
-            None
-
-        Returns:
-            float: Input attenuation in dB
-
-        Raises:
-            None
-        """
-        return float(self._query(":POW:ATT?"))
-
-    def trigger_measurement(self):
-        """
-        Triggers a measurement
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        self.lock.acquire()
-
-        try:
-            self._write(":INIT:IMM", acquireLock=False)
-            running = True
-            while running:
-                try:
-                    running = self._query("*OPC?", acquireLock=False) == "0"
-                except VisaIOError:
-                    pass
-                sleep(1)
-        finally:
-            self.lock.release()
-
-    def get_trace_data(self) -> list[float]:
+    def get_trace_data(self) -> List[Tuple[float, float]]:
         """
         Returns trace data
 
@@ -439,200 +430,122 @@ class SpectrumAnalyser(BaseInstrument):
             None
 
         Returns:
-            list[float]: y axis value of each datapoint
+            List[Tuple[float, float]: List of (frequency in Hz, power in dBm) tuples
 
         Raises:
             None
         """
-        self.trigger_measurement()
-        data = self._query(":TRAC? TRACE1")
-        return [float(x) for x in data.split(",")]
+        raise NotImplementedError  # pragma: no cover
 
-    def set_detector_mode(self, mode: DetectorMode) -> None:
+    def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
         """
-        Sets detector mode
+        En/disables a marker
 
         Args:
-            mode (DetectorMode): Detector Mode
+            marker_number (int): which marker to en/disable
+            enabled (bool): Enable marker if True, Disable if False
 
         Returns:
             None
 
         Raises:
-            None
+            ValueError: If <marker_number> is invalid
+            AssertionError: If readback state doesn't match requested
         """
-        if mode == DetectorMode.RMS:
-            self._write(":DET RMS")
-        else:
-            raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
-        if self.verify:
-            assert self.read_detector_mode() == mode
-
-    def read_detector_mode(self) -> DetectorMode:
+    def get_marker_state(self, marker_number: int = 1) -> bool:
         """
-        Sets detector mode
+        Returns state of a particular marker
 
         Args:
-            None
+            marker_number (int): which marker to get the state of
 
         Returns:
-            DetectorMode: Detector mode
+            bool: True if the marker is enabled
 
         Raises:
             None
         """
-        ret = self._query(":DET?")
-        if ret == "RMS":
-            return DetectorMode.RMS
-        else:
-            raise NotImplementedError(ret)
+        raise NotImplementedError  # pragma: no cover
 
-    ##########################################################
-    ## Functions for which no generic implementation exists ##
-    ##########################################################
+    def enable_marker(self, marker_number: int = 1):
+        self.set_marker_state(marker_number, True)
 
-    def set_rbw(self, rbw: int) -> None:
+    def disable_marker(self, marker_number: int = 1):
+        self.set_marker_state(marker_number, False)
+
+    def set_marker_frequency(self, freq: float, marker_number: int = 1):
         """
-        Sets Resolution Bandwidth
+        Sets marker to a particular frequency
 
         Args:
-           rbw (float): RBW in Hz, or "auto"
+            freq (float): Frequency to set the marker to
+            marker_number (int): which marker to move
 
         Returns:
             None
 
         Raises:
-            None
+            ValueError: If <marker_number> is invalid
+            AssertionError: If readback frequency doesn't match requested
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
-    def read_rbw(self) -> int:
+    def get_marker_frequency(self, marker_number: int = 1) -> float:
         """
-        Returns Resolution Bandwidth
+        Reads frequency a particular marker is set to
 
         Args:
-           None
+            marker_number (int): which marker to query
 
         Returns:
-            int: RBW in Hz
+            float: marker frequency in Hz
 
         Raises:
-            None
+            ValueError: If <marker_number> is invalid
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
-    def set_vbw(self, vbw: int) -> None:
+    def measure_marker_power(self, marker_number: int = 1) -> float:
         """
-        Sets Video Bandwidth
+        Reads power for a a particular marker
 
         Args:
-           vbw (float): VBW in Hz, or "auto"
+            marker_number (int): which marker to query
 
         Returns:
-            None
+            float: marker power in dBm
 
         Raises:
-            None
+            ValueError: If <marker_number> is invalid
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
-    def read_vbw(self) -> int:
+    def measure_power(self, freq: float, marker_number: int = 1) -> float:
         """
-        Returns Video Bandwidth
+        Measure power at a certain frequency by placing a
+        marker and reporting the value
 
         Args:
-           None
+            freq (float): frequency in Hz
 
         Returns:
-            int: VBW in Hz
+            float: power in dBm
 
         Raises:
-            None
+            ValueError: If <freq> is not within the trace data
         """
-        raise NotImplementedError
+        if marker_number > self.max_markers:
+            raise ValueError
+        if not self.get_marker_state(marker_number):
+            self.enable_marker(marker_number)
+        self.set_marker_frequency(freq, marker_number)
+        return self.measure_marker_power(marker_number)
 
-    def set_vbw_rbw_ratio(self, ratio: float) -> None:
+    def trigger_sweep(self):
         """
-        Sets VBW:RBW ratio
-
-        Args:
-           ratio (float): Desired VBW:RBW ratio
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If requested ratio is not supported
-            AssertionError: If readback fails
-        """
-        raise NotImplementedError
-
-    def read_vbw_rbw_ratio(self) -> float:
-        """
-        Returns VBW:RBW ratio
-
-        Args:
-           None
-
-        Returns:
-            float: VBW:RBW ratio
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def measure_power_marker(self, freq: int) -> float:
-        """
-        Measures RF Power by putting a marker at frequency 'freq'
-
-        Args:
-            freq (float): Frequency of measured signal
-
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def measure_power_zero_span(self, freq: int) -> float:
-        """
-        Measures RF Power by setting centre frequency to 'freq'
-        and span to 0. Returns max value seen
-
-        Args:
-            freq (float): Frequency of measured signal
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def enable_averaging(self, numAverages: int = 10) -> None:
-        """
-        Sets the number of traces to average each measurement over
-
-        Args:
-            numAverages (int): Number of traces to average over
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def disable_averaging(self) -> None:
-        """
-        Disables averaging of traces
+        Triggers a sweep and blocks until completion
 
         Args:
             None
@@ -643,34 +556,4 @@ class SpectrumAnalyser(BaseInstrument):
         Raises:
             None
         """
-        raise NotImplementedError
-
-    def set_preamp_state(self, enabled: bool) -> None:
-        """
-        Sets the state of the RF preamp
-
-        Args:
-            enabled (bool): True to enable the preamp
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
-
-    def read_preamp_state(self) -> bool:
-        """
-        Returns the state of the RF preamp
-
-        Args:
-            None
-
-        Returns:
-            bool: True if enabled
-
-        Raises:
-            None
-        """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover

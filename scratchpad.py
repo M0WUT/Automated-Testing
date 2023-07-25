@@ -1,38 +1,64 @@
-import logging
+import math
+import sys
 from time import sleep
 
-import serial
+from numpy import logspace
 
-from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import SignalGenerator
-from AutomatedTesting.Instruments.TopLevel.config import (
-    dsa815tg,
-    e4407b,
-    noiseSource,
+from AutomatedTesting.Instruments.InstrumentConfig import (
+    dmm,
+    e4433b,
     sdg2122x,
-    tenmaSingleChannel,
+    smb100a,
+    ssa3032x,
 )
-from AutomatedTesting.ProperTests.IMD import run_imd_test
-from AutomatedTesting.ProperTests.NoiseFigure import run_noise_figure_test
-from AutomatedTesting.PytestDefinitions.TestSupervisor import TestSupervisor
+from AutomatedTesting.Tests.GainFlatnessPAE import run_gain_flatness_test
+from AutomatedTesting.Tests.IMD_Full import run_imd_test
 
-PORT = "/dev/ttyACM0"
-BAUDRATE = 9600
-TIMEOUT = 1
+# with smb100a, ssa3032x, dmm:
+#     test_tone = smb100a.reserve_channel(1, "Test Tone")
+#     test_tone.set_soft_power_limits(test_tone.absolute_min_power, 5)
+#     dmm.reserve("Current Measurement")
+#     ssa3032x.reserve("Power Measurement")
+#     run_gain_flatness_test(
+#         freq_list=[20e6, 28e6, 30e6],
+#         input_power_list=range(-40, 5, 1),
+#         sig_gen=test_tone,
+#         power_meter=ssa3032x,
+#         dmm=dmm,
+#         loss_before_dut=0,
+#         loss_after_dut=0,
+#         ref_level=30,
+#     )
+
+run_imd_test(
+    freqList=[100e6],
+    toneSpacing=10e6,
+    channel1=None,
+    channel2=None,
+    spectrumAnalyser=None,
+    lowerPowerLimit=-40,
+    upperPowerLimit=3,
+    refLevel=25,
+    intermodTerms=[3, 5],
+    resolutionBandWidth=10e3,
+    pickleFile="imdTest.P",
+)
 
 
-with TestSupervisor(
-    loggingLevel=logging.DEBUG, instruments=[e4407b], saveResults=False
-):
-    while True:
-        print(e4407b._query("SYST:ERR?"))
-        sleep(1)
+# with ssa3032x, smb100a, e4433b:
+#     lower_channel = smb100a.reserve_channel(1, "Lower Tone")
+#     upper_channel = e4433b.reserve_channel(1, "Upper Tone")
 
-
-with TestSupervisor(
-    loggingLevel=logging.DEBUG,
-    instruments=[dsa815tg, noiseSource, tenmaSingleChannel],
-    saveResults=False,
-):
-    psu = tenmaSingleChannel.reserve_channel(1, "Power Supply")
-
-    run_noise_figure_test(300e6, 500e6, dsa815tg, psu, noiseSource, 601)
+#     run_imd_test(
+#         freqList=[100e6],
+#         toneSpacing=1e6,
+#         channel1=lower_channel,
+#         channel2=upper_channel,
+#         spectrumAnalyser=ssa3032x,
+#         lowerPowerLimit=-40,
+#         upperPowerLimit=3,
+#         refLevel=25,
+#         intermodTerms=[3, 5],
+#         resolutionBandWidth=10e3
+#         pickleFile="imdTest.P",
+#     )

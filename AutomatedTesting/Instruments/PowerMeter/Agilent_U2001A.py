@@ -1,150 +1,90 @@
-import logging
+from logging import Logger
+
+from pyvisa import ResourceManager
 
 from AutomatedTesting.Instruments.PowerMeter.PowerMeter import PowerMeter
+from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
 class Agilent_U2001A(PowerMeter):
-    def __init__(self, address, name="Agilent U2001A"):
+    def __init__(
+        self,
+        resource_manager: ResourceManager,
+        visa_address: str,
+        name: str,
+        expected_idn_response: str,
+        verify: bool,
+        logger: Logger,
+        **kwargs,
+    ):
         super().__init__(
-            address,
-            id="Agilent Technologies,U2001A,MY53150007,A1.03.05",
+            resource_manager=resource_manager,
+            visa_address=visa_address,
             name=name,
-            minFreq=10e6,
-            maxFreq=6e9,
+            expected_idn_response=expected_idn_response,
+            verify=verify,
+            logger=logger,
+            min_freq=10e6,
+            max_freq=6e9,
             timeout=500,
+            **kwargs,
         )
 
-    def initialise(self, resourceManager, supervisor):
-        super().initialise(resourceManager, supervisor)
+    def __enter__(self):
+        self.initialise()
+
+    def initialise(self):
+        super().initialise()
         self._write("INIT:CONT ON")
+        return self
 
     def internal_zero(self):
-        """
-        Zeros power meter. Does not require external intervation
-        i.e. removal of RF signal / disconnection of meter
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
         self._write("CAL:ZERO:TYPE INT")
         self._zero()
-        logging.info(f"{self.name} zeroed internally")
+        self.logger.info(f"{self.name} zeroed internally")
 
     def external_zero(self):
-        """
-        Zeros power meter. Does require external intervation
-        i.e. removal of RF signal / disconnection of meter
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        logging.debug(f"{self.name}: Waiting for user intervention on zeroing")
+        self.logger.debug(f"{self.name}: Waiting for user intervention on zeroing")
         input(
             f"Please disconnect input from {self.name} and press "
             "any key to continue..."
         )
         self._write("CAL:ZERO:TYPE EXT")
         self._zero()
-        logging.info(f"{self.name} zeroed externally")
-        logging.debug(f"{self.name}: Waiting for user intervention on zeroing")
+        self.logger.info(f"{self.name} zeroed externally")
+        self.logger.debug(f"{self.name}: Waiting for user intervention on zeroing")
         input(
             f"Please reconnect input to {self.name} and press " "any key to continue..."
         )
 
-    def _zero(self):
-        """
-        Performs the zeroing of the meter with whatever source
-        (internal or external) is already set
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: if cal fails
-        """
-        logging.info(f"Calibrating {self.name}. This takes a while...")
-        x = self.dev.timeout
-        self.dev.timeout = 0
-        result = self._query("CAL?")
-        self.dev.timeout = x
-        if result != "0":
-            logging.error(f"Calibration of {self.name} failed. Return code: {result}")
-            assert False
-
     def set_freq(self, freq):
-        """
-        Informs power meter of frequency to allow it to
-        compensate
+        assert self.reserved
+        self._write(f"FREQ {readable_freq(freq)}")
+        if self.verify:
+            assert self.get_freq() == freq
+        self.centreFreq = freq
 
-        Args:
-            None
+    def get_freq(self) -> float:
+        return float(self._query("FREQ?"))
 
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def measure_power(self, freq=None):
-        """
-        Measures RF Power
-
-        Args:
-            freq (float): Frequency in Hz to allow for reading correction
-
-        Returns:
-            float: Measured power in dBm
-
-        Raises:
-            None
-        """
-
+    def measure_power(self, freq: float) -> float:
+        assert self.reserved
+        if freq != self.centreFreq:
+            self.set_freq(freq)
         timeout = self.dev.timeout
         self.dev.timeout = 0
         x = float(self._query("MEAS? DEF, 3, (@1)"))
         self.dev.timeout = timeout
-        return self._correct_power(x, freq)
+        return x
 
-    def read_instrument_errors(self):
+    def _zero(self):
         """
-        Checks whole instrument for errors
-
-        Args:
-            None
-
-        Returns:
-            list(Tuple): Pairs of (status code, error message)
-
-        Raises:
-            None
+        Internal helper function as internal and external zeroing
+        uses the same comamand
         """
-        errorList = []
-        errors = self._query("SYSTem:ERRor?").strip()
-        if errors != '+0,"No error"':
-            errorStrings = errors.split('",')
-
-            for x in errorStrings:
-                errorCode, errorMessage = x.split(',"')
-                # Last item in list isn't comma terminated so need
-                # to manually remove trailing speech marks
-                if errorMessage[-1:] == '"':
-                    errorMessage = errorMessage[:-1]
-                errorList.append((int(errorCode), errorMessage))
-        return errorList
+        self.logger.info(f"Calibrating {self.name}. This takes a while...")
+        x = self.dev.timeout
+        self.dev.timeout = 0
+        result = self._query("CAL?")
+        self.dev.timeout = x
+        assert result != 0, f"Calibration of {self.name} failed. Return code: {result}"
