@@ -126,8 +126,7 @@ def best_fit_line_with_known_gradient(
             <= gradient
             <= (1 + maxErrorPercentage / 100) * expectedGradient
         ):
-            print("FOU*ND ONE")
-            return StraightLine(round(gradient, 4), round(intercept, 4))
+            return StraightLine(expectedGradient, round(intercept, 4))
         else:
             # Work out slope if remove top or bottom element
             gradient_with_lowest_removed = stats.linregress(x[1:], y[1:]).slope

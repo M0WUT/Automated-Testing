@@ -30,35 +30,20 @@ from AutomatedTesting.Tests.IMD_Full import run_imd_test
 #         ref_level=30,
 #     )
 
-run_imd_test(
-    freqList=[100e6],
-    toneSpacing=10e6,
-    channel1=None,
-    channel2=None,
-    spectrumAnalyser=None,
-    lowerPowerLimit=-40,
-    upperPowerLimit=3,
-    refLevel=25,
-    intermodTerms=[3, 5],
-    resolutionBandWidth=10e3,
-    pickleFile="imdTest.P",
-)
 
+with ssa3032x, smb100a, e4433b:
+    lower_channel = smb100a.reserve_channel(1, "Lower Tone")
+    upper_channel = e4433b.reserve_channel(1, "Upper Tone")
 
-# with ssa3032x, smb100a, e4433b:
-#     lower_channel = smb100a.reserve_channel(1, "Lower Tone")
-#     upper_channel = e4433b.reserve_channel(1, "Upper Tone")
-
-#     run_imd_test(
-#         freqList=[100e6],
-#         toneSpacing=1e6,
-#         channel1=lower_channel,
-#         channel2=upper_channel,
-#         spectrumAnalyser=ssa3032x,
-#         lowerPowerLimit=-40,
-#         upperPowerLimit=3,
-#         refLevel=25,
-#         intermodTerms=[3, 5],
-#         resolutionBandWidth=10e3
-#         pickleFile="imdTest.P",
-#     )
+    run_imd_test(
+        freqList=[x * 1e6 for x in range(20, 27)],
+        toneSpacing=1e6,
+        channel1=lower_channel,
+        channel2=upper_channel,
+        spectrumAnalyser=ssa3032x,
+        lowerPowerLimit=-40,
+        upperPowerLimit=3,
+        refLevel=25,
+        intermodTerms=[3, 5],
+        #pickleFile="imdTest.P",
+    )
