@@ -36,8 +36,8 @@ with ssa3032x, smb100a, e4433b:
     upper_channel = e4433b.reserve_channel(1, "Upper Tone")
 
     run_imd_test(
-        freqList=[x * 1e6 for x in range(20, 27)],
-        toneSpacing=1e6,
+        freqList=[x * 1e6 for x in range(20, 40)],
+        toneSpacing=10e3,
         channel1=lower_channel,
         channel2=upper_channel,
         spectrumAnalyser=ssa3032x,
@@ -45,5 +45,5 @@ with ssa3032x, smb100a, e4433b:
         upperPowerLimit=3,
         refLevel=25,
         intermodTerms=[3, 5],
-        #pickleFile="imdTest.P",
+        # pickleFile="imdTest.P",
     )
