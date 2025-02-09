@@ -156,8 +156,8 @@ def run_imd_test(
 
                 datapoints.append(newDatapoint)
 
-                # Increase in 0.25dB steps
-                power += 0.25
+                # Increase in 0.3dB steps
+                power += 0.3
             # Save sweep to dictionary of IMD sweeps
             imdSweeps[freq] = datapoints
 

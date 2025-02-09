@@ -33,11 +33,11 @@ resource_manager = ResourceManager("@py")
 
 logger = logging.getLogger("m0wut_automated_testing")
 logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Console Logging
 logging_handler = logging.StreamHandler()
-logging_handler.setLevel(logging.DEBUG)
+logging_handler.setLevel(logging.INFO)
 logging_handler.setFormatter(logging_format)
 logger.addHandler(logging_handler)
 
