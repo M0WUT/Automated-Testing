@@ -5,3 +5,5 @@ scipy
 pyusb
 pyserial
 xlsxwriter
+pytest
+pytest-cov

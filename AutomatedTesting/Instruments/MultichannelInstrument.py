@@ -125,7 +125,6 @@ class MultichannelInstrument(BaseInstrument):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        channel_count: int,
         channels: list[InstrumentChannel],
         logger: logging.Logger,
         **kwargs,
@@ -139,14 +138,11 @@ class MultichannelInstrument(BaseInstrument):
             logger=logger,
             **kwargs,
         )
-
-        assert len(channels) == channel_count
-        expected_channels = list(range(1, channel_count + 1))
+        self.channel_count = len(channels)
+        expected_channels = list(range(1, self.channel_count + 1))
         found_channels = [x.channel_number for x in channels]
         assert expected_channels == found_channels
-
         self.channels = channels
-        self.channel_count = channel_count
 
     def __enter__(self):
         self.initialise()
@@ -174,18 +170,6 @@ class MultichannelInstrument(BaseInstrument):
             raise ValueError(
                 f"Invalid channel number {channel_number} requested for {self.name}"
             )
-
-    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
-        raise NotImplementedError
-
-    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
-        raise NotImplementedError
-
-    def enable_channel_output(self, channel_number: int):
-        self.set_channel_output_enabled_state(channel_number, True)
-
-    def disable_channel_output(self, channel_number: int):
-        self.set_channel_output_enabled_state(channel_number, False)
 
     def reserve_channel(self, channel_number: int, purpose: str) -> InstrumentChannel:
         self.validate_channel_number(channel_number)

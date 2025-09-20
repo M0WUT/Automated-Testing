@@ -4,8 +4,10 @@ from typing import List, Tuple
 from numpy import linspace
 from pyvisa import ResourceManager
 
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
-    SpectrumAnalyser
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
+from AutomatedTesting.Misc.UsefulFunctions import get_key_from_dict_value
 
 
 class SiglentSSA3032XPlus(SpectrumAnalyser):
@@ -27,49 +29,71 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             verify=verify,
             logger=logger,
             min_freq=0,
-            max_freq=3.2e9,
+            max_freq=int(3.2e9),
             min_sweep_points=751,
             max_sweep_points=751,
             min_span=100,
-            max_span=3.2e9,
+            max_span=int(3.2e9),
             min_attenuation=0,
             max_attenuation=51,
             has_preamp=True,
+            supported_rbw=[
+                1,
+                3,
+                10,
+                30,
+                100,
+                300,
+                1000,
+                3000,
+                10000,
+                30000,
+                100000,
+                300000,
+                1000000,
+            ],
+            supported_vbw=[
+                1,
+                3,
+                10,
+                30,
+                100,
+                300,
+                1000,
+                3000,
+                10000,
+                30000,
+                100000,
+                300000,
+                1000000,
+                3000000,
+            ],
+            max_num_traces=4,
+            max_num_markers=8,
+            supports_emi_measurements=True,
+            supported_emi_rbw=[200, 9000, 120000, 1000000],
             **kwargs,
         )
-        self.supported_rbw = [
-            1,
-            3,
-            10,
-            30,
-            100,
-            300,
-            1000,
-            3000,
-            10e3,
-            30e3,
-            100e3,
-            300e3,
-            1e6,
-        ]
-        self.supported_vbw = [
-            1,
-            3,
-            10,
-            30,
-            100,
-            300,
-            1000,
-            3000,
-            10e3,
-            30e3,
-            100e3,
-            300e3,
-            1e6,
-        ]
+
+        self._trace_str = {
+            SpectrumAnalyser.TraceMode.CLEAR_WRITE: "WRIT",
+            SpectrumAnalyser.TraceMode.MAX_HOLD: "MAXH",
+            SpectrumAnalyser.TraceMode.MIN_HOLD: "MINH",
+            SpectrumAnalyser.TraceMode.VIEW: "VIEW",
+            SpectrumAnalyser.TraceMode.BLANK: "BLAN",
+            SpectrumAnalyser.TraceMode.AVERAGE: "AVER",
+        }
+
+        self._filter_str = {
+            SpectrumAnalyser.FilterType.NORMAL: "GAUSS",
+            SpectrumAnalyser.FilterType.EMI: "EMI",
+        }
 
     def get_instrument_errors(self) -> List[Tuple[int, str]]:
         return []
+
+    def set_local_control(self):
+        self._write("SYST:LOC")
 
     def set_start_freq(self, freq: float):
         if not (self.min_freq <= freq <= self.max_freq):
@@ -120,12 +144,8 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
     def get_span(self) -> float:
         return float(self._query(":FREQ:SPAN?"))
 
-    def set_rbw(self, rbw: float):
-        if rbw not in self.supported_rbw:
-            raise ValueError
+    def _set_rbw(self, rbw: float):
         self._write(f":BWID {rbw}")
-        if self.verify:
-            assert self.get_rbw() == rbw
 
     def get_rbw(self) -> float:
         return float(self._query(":BWID?"))
@@ -152,9 +172,7 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         self,
         mode: SpectrumAnalyser.SweepMode = SpectrumAnalyser.SweepMode.CONTINUOUS,
     ):
-        self._write(
-            f":INIT:CONT {'1' if mode == self.SweepMode.CONTINUOUS else '0'}"
-        )
+        self._write(f":INIT:CONT {'1' if mode == self.SweepMode.CONTINUOUS else '0'}")
         if self.verify:
             assert self.get_sweep_mode() == mode
 
@@ -200,37 +218,53 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         )
         return list(zip(freqs, powers))
 
-    def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
-        if marker_number > self.max_markers:
+    def set_marker_enabled_state(self, marker_number: int = 1, enabled: bool = False):
+        if marker_number > self.max_num_markers:
             raise ValueError
-        self._write(
-            f":CALC:MARK{marker_number}:STAT {'ON' if enabled else 'OFF'}"
-        )
+        self._write(f":CALC:MARK{marker_number}:STAT {'ON' if enabled else 'OFF'}")
         if self.verify:
-            assert self.get_marker_state(marker_number) == enabled
+            assert self.get_marker_enabled_state(marker_number) == enabled
 
-    def get_marker_state(self, marker_number: int = 1) -> bool:
-        if marker_number > self.max_markers:
+    def get_marker_enabled_state(self, marker_number: int = 1) -> bool:
+        if marker_number > self.max_num_markers:
             raise ValueError
         return self._query(f":CALC:MARK{marker_number}:STAT?") == "1"
 
     def set_marker_frequency(self, freq: float, marker_number: int = 1):
-        if marker_number > self.max_markers:
+        if marker_number > self.max_num_markers:
             raise ValueError
         self._write(f":CALC:MARK{marker_number}:X {freq}")
         if self.verify:
             assert self.get_marker_frequency(marker_number) == freq
 
     def get_marker_frequency(self, marker_number: int = 1) -> float:
-        if marker_number > self.max_markers:
+        if marker_number > self.max_num_markers:
             raise ValueError
         return float(self._query(f":CALC:MARK{marker_number}:X?"))
 
     def measure_marker_power(self, marker_number: int = 1) -> float:
-        if marker_number > self.max_markers:
+        if marker_number > self.max_num_markers:
             raise ValueError
         return float(self._query(f":CALC:MARK{marker_number}:Y?"))
 
     def trigger_sweep(self):
         self._write(":INIT:IMM")
         self.wait_until_op_complete()
+
+    def set_trace_mode(self, trace_num: int, mode: SpectrumAnalyser.TraceMode):
+        if not 1 <= trace_num <= self.max_span:
+            raise ValueError
+        self._write(f":TRAC{trace_num}:MODE {self._trace_str[mode]}")
+        if self.verify:
+            assert self.get_trace_mode(trace_num) == mode
+
+    def get_trace_mode(self, trace_num: int) -> SpectrumAnalyser.TraceMode:
+        response = self._query(f":TRAC{trace_num}:MODE?")
+        return get_key_from_dict_value(self._trace_str, response)
+
+    def _set_filter_type(self, filter_type: SpectrumAnalyser.FilterType):
+        self._write(f":FILT:TYPE {self._filter_str[filter_type]}")
+
+    def get_filter_type(self) -> SpectrumAnalyser.FilterType:
+        response = self._query(":FILT:TYPE?")
+        return get_key_from_dict_value(self._filter_str, response)

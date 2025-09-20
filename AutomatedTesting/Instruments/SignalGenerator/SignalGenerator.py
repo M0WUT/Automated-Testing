@@ -268,15 +268,8 @@ class SignalGenerator(MultichannelInstrument):
     class with the possible exception of enter and get_instrument_errors
     """
 
-    def reserve_channel(
-        self, channel_number: int, purpose: str
-    ) -> SignalGeneratorChannel:
-        return super().reserve_channel(channel_number, purpose)
-
-    def __enter__(self):
-        self.initialise()
-
     def initialise(self):
+        self.channels: list[SignalGeneratorChannel]
         super().initialise()
         if self.only_software_control:
             for x in self.channels:
@@ -285,6 +278,11 @@ class SignalGenerator(MultichannelInstrument):
                 x.set_freq(x.min_freq)
                 x.set_power(x.min_power)
         return self
+
+    def reserve_channel(
+        self, channel_number: int, purpose: str
+    ) -> SignalGeneratorChannel:
+        return super().reserve_channel(channel_number, purpose)
 
     def get_instrument_errors(self) -> List[Tuple[int, str]]:
         return super().get_instrument_errors()

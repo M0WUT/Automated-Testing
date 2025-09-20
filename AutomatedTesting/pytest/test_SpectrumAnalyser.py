@@ -6,12 +6,13 @@ import pytest
 
 # Local imports
 from AutomatedTesting.Instruments.InstrumentConfig import ssa3032x
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
-    SpectrumAnalyser
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
 
 
-@pytest.fixture
-def sa(spectrum_analyser) -> SpectrumAnalyser:
+@pytest.fixture(scope="function")
+def sa(spectrum_analyser):
     with spectrum_analyser:
         yield spectrum_analyser
 
@@ -102,8 +103,14 @@ def test_input_attenuation(sa: SpectrumAnalyser):
         sa.set_input_attenuation(sa.max_attenuation + 1)
 
 
+def test_ref_level(sa: SpectrumAnalyser):
+    # Not really testing anything here, just that the function is implemented
+    sa.set_ref_level(-20)
+
+
 def test_trace_data(sa: SpectrumAnalyser):
     # Not really testing anything here, just that the function is implemented
+    sa.trigger_sweep()
     sa.get_trace_data()
 
 
@@ -111,20 +118,20 @@ def test_marker_power(sa: SpectrumAnalyser):
     sa.set_start_freq(sa.min_freq)
     sa.set_stop_freq(sa.max_freq)
     sa.measure_power(0.5 * (sa.min_freq + sa.max_freq))
+    sa.disable_marker(1)
     with pytest.raises(ValueError):
-        sa.set_marker_state(sa.max_markers + 1, True)
+        sa.set_marker_enabled_state(sa.max_num_markers + 1, True)
     with pytest.raises(ValueError):
-        sa.get_marker_state(sa.max_markers + 1)
+        sa.get_marker_enabled_state(sa.max_num_markers + 1)
     with pytest.raises(ValueError):
-        sa.set_marker_frequency(sa.min_freq, sa.max_markers + 1)
+        sa.set_marker_frequency(sa.min_freq, sa.max_num_markers + 1)
     with pytest.raises(ValueError):
-        sa.get_marker_frequency(sa.max_markers + 1)
+        sa.get_marker_frequency(sa.max_num_markers + 1)
     with pytest.raises(ValueError):
-        sa.measure_marker_power(sa.max_markers + 1)
+        sa.measure_marker_power(sa.max_num_markers + 1)
     with pytest.raises(ValueError):
-        sa.measure_power(sa.min_freq, sa.max_markers + 1)
+        sa.measure_power(sa.min_freq, sa.max_num_markers + 1)
 
 
-def test_ref_level(sa: SpectrumAnalyser):
-    # Not really testing anything here, just that the function is implemented
-    sa.set_ref_level(-20)
+def test_instrument_errors(sa: SpectrumAnalyser):
+    sa.get_instrument_errors()

@@ -2,9 +2,9 @@
 import logging
 import os
 import signal
-from multiprocessing import Lock, Process
+from threading import Lock, Thread
 from time import sleep
-from typing import List, Tuple
+from typing import Optional
 
 # Third party imports
 from pyvisa import ResourceManager, VisaIOError
@@ -72,9 +72,11 @@ class BaseInstrument:
         #  under software control (as opposed to being used interactively)
         if self.only_software_control:
             self.reset()
-            self.error_process = Process(
-                target=self.check_instrument_errors, args=[os.getpid()], daemon=True
+            pid = os.getpid()
+            self.error_process = Thread(
+                target=self.check_instrument_errors, args=[pid], daemon=True
             )
+
             self.error_process.start()
 
         self.logger.info(f"{self.name} initialised")
@@ -83,10 +85,9 @@ class BaseInstrument:
         self.cleanup()
 
     def cleanup(self):
+        self.logger.info(f"Shutting down connection to {self.name}")
         if self.only_software_control:
             self.set_local_control()
-            if self.error_process:
-                self.error_process.terminate()
         if self.dev:
             self.dev.close()
             self.dev = None
@@ -151,7 +152,7 @@ class BaseInstrument:
                 # Inform main thread
                 os.kill(pid, signal.SIGTERM)
 
-    def get_instrument_errors(self) -> List[Tuple[int, str]]:
+    def get_instrument_errors(self) -> list[tuple[int, str]]:
         """
         Function to extract error messages from the device.
         This can be overwritten by sub-classes if this uses different syntax
@@ -233,15 +234,29 @@ class BaseInstrument:
         """
         self.lock.acquire()
         try:
-            self._write(command, acquire_lock=False)
-            response = self._read(acquire_lock=False)
+            response = self.dev.query(command).strip()  # type: ignore
+            self.logger.debug(
+                f"[{self.instrument_name}] QUERY: {command}\tResponse: {response}"
+            )
         finally:
             self.lock.release()
         return response
 
-    def wait_until_op_complete(self):
+    def wait_until_op_complete(self, timeout_s: Optional[float] = None):
         """
         Blocks until current commmands have all been executed
         """
-        while self._query("*OPC?") == "0":
-            sleep(0.1)
+        self._query_with_increased_timeout("*OPC?", timeout_s)
+
+    def _query_with_increased_timeout(
+        self, query: str, timeout_s: Optional[float] = None
+    ):
+        old_timeout = self.dev.timeout  # type: ignore
+        try:
+            # There seems to be a bug with setting timeout to None (should be infinite)
+            # so set it to a week instead
+            self.dev.timeout = timeout_s if timeout_s else (86400000)  # type: ignore
+            result = self._query(query)
+        finally:
+            self.dev.timeout = old_timeout  # type: ignore
+        return result

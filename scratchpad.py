@@ -6,11 +6,17 @@ from time import sleep
 
 from numpy import logspace
 
-from AutomatedTesting.Instruments.InstrumentConfig import (dmm, e4433b,
-                                                           sdg2122x, smb100a,
-                                                           ssa3032x)
-from AutomatedTesting.Tests.GainFlatnessPAE import run_gain_flatness_test
-from AutomatedTesting.Tests.IMD_Full import run_imd_test
+from AutomatedTesting.Instruments.InstrumentConfig import (
+    dmm,
+    e4433b,
+    sdg2122x,
+    smb100a,
+    ssa3032x,
+)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
+)
+
 
 # with smb100a, ssa3032x, dmm:
 #     test_tone = smb100a.reserve_channel(1, "Test Tone")
@@ -29,19 +35,5 @@ from AutomatedTesting.Tests.IMD_Full import run_imd_test
 #     )
 
 
-with ssa3032x, smb100a, e4433b:
-    lower_channel = smb100a.reserve_channel(1, "Lower Tone")
-    upper_channel = e4433b.reserve_channel(1, "Upper Tone")
-
-    run_imd_test(
-        freqList=[x * 1e6 for x in range(20, 40)],
-        toneSpacing=10e3,
-        channel1=lower_channel,
-        channel2=upper_channel,
-        spectrumAnalyser=ssa3032x,
-        lowerPowerLimit=-40,
-        upperPowerLimit=3,
-        refLevel=25,
-        intermodTerms=[3, 5],
-        # pickleFile="imdTest.P",
-    )
+with ssa3032x:
+    ssa3032x.set_rbw(9000, SpectrumAnalyser.FilterType.EMI)

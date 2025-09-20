@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Optional, Any
 
 import numpy
 from scipy import stats
@@ -42,6 +42,12 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
     raise ValueError(f"Could not convert {x} to SI notation")
 
 
+def get_key_from_dict_value(dict: dict, value: Any):
+    print(dict)
+    reversed_dict = {v: k for k, v in dict.items()}
+    return reversed_dict[value]
+
+
 def readable_freq(freq: float) -> str:
     return prefixify(freq, units="Hz", decimal_places=9)
 
@@ -56,7 +62,7 @@ class StraightLine:
         return self.gradient * x + self.intercept
 
 
-def intercept_point(a: StraightLine, b: StraightLine) -> Tuple[float, float]:
+def intercept_point(a: StraightLine, b: StraightLine) -> tuple[float, float]:
     """Takes two straight lines and returns the x and y coordinates that intercept"""
     assert a.gradient != b.gradient, "Two parallel lines will never intercept"
     x = (b.intercept - a.intercept) / (a.gradient - b.gradient)
@@ -66,12 +72,12 @@ def intercept_point(a: StraightLine, b: StraightLine) -> Tuple[float, float]:
 
 
 def best_fit_line_with_known_gradient(
-    x_values: List[float],
-    y_values: List[float],
+    x_values: list[float],
+    y_values: list[float],
     expected_gradient: float = 3,
     max_error_percentage: float = 3,
     window_size: int = 11,
-) -> StraightLine:
+) -> Optional[StraightLine]:
     """
     Takes a list of y and x values, attempts to find line by removing data
     from whichever ends has gradient furthest from expected
@@ -125,7 +131,13 @@ def best_fit_line_with_known_gradient(
         # if expected_gradient == 3:
         #     print(x)
         #     print(y)
-        gradient, intercept, _, _, _ = stats.linregress(x, y)
+
+        gradient: float = 0
+        intercept: float = 0
+
+        gradient, intercept, _, _, _ = stats.linregress(
+            x, y
+        )  # pyright: ignore[reportAssignmentType]
         if (
             (1 - max_error_percentage / 100) * expected_gradient
             <= gradient
@@ -134,8 +146,12 @@ def best_fit_line_with_known_gradient(
             return StraightLine(expected_gradient, round(intercept, 4))
         else:
             # Work out slope if remove top or bottom element
-            gradient_with_lowest_removed = stats.linregress(x[1:], y[1:]).slope
-            gradient_with_highest_removed = stats.linregress(x[:-1], y[:-1]).slope
+            gradient_with_lowest_removed = stats.linregress(
+                x[1:], y[1:]
+            ).slope  # pyright: ignore[reportAttributeAccessIssue]
+            gradient_with_highest_removed = stats.linregress(
+                x[:-1], y[:-1]
+            ).slope  # pyright: ignore[reportAttributeAccessIssue]
 
             if abs(gradient_with_highest_removed - expected_gradient) < abs(
                 gradient_with_lowest_removed - expected_gradient

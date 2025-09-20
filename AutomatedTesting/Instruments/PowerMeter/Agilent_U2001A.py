@@ -71,11 +71,8 @@ class AgilentU2001A(PowerMeter):
         assert self.reserved
         if freq != self.centreFreq:
             self.set_freq(freq)
-        timeout = self.dev.timeout
-        self.dev.timeout = 0
-        x = float(self._query("MEAS? DEF, 3, (@1)"))
-        self.dev.timeout = timeout
-        return x
+
+        return float(self._query_with_increased_timeout("MEAS? DEF, 3, (@1)", 30))
 
     def _zero(self):
         """
@@ -83,8 +80,5 @@ class AgilentU2001A(PowerMeter):
         uses the same comamand
         """
         self.logger.info(f"Calibrating {self.name}. This takes a while...")
-        x = self.dev.timeout
-        self.dev.timeout = 0
-        result = self._query("CAL?")
-        self.dev.timeout = x
+        result = self._query_with_increased_timeout("CAL?", 120)
         assert result != 0, f"Calibration of {self.name} failed. Return code: {result}"

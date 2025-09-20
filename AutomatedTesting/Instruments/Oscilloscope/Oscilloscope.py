@@ -118,6 +118,8 @@ class OscilloscopeChannel(InstrumentChannel):
 
 class Oscilloscope(MultichannelInstrument):
     def initialise(self):
+        # Pure type hint
+        self.channels: list[OscilloscopeChannel]
         super().initialise()
         if self.only_software_control:
             for x in self.channels:

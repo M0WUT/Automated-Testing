@@ -9,8 +9,8 @@ import xlsxwriter
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
     SignalGeneratorChannel,
 )
-from AutomatedTesting.Instruments.spectrum_analyser.spectrum_analyser import (
-    spectrum_analyser,
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
+    SpectrumAnalyser,
 )
 from AutomatedTesting.Misc.ExcelHandler import ExcelWorksheetWrapper
 from AutomatedTesting.Misc.UsefulFunctions import (
@@ -44,7 +44,7 @@ def run_imd_test(
     tone_spacing: int,
     channel1: SignalGeneratorChannel,
     channel2: SignalGeneratorChannel,
-    spectrum_analyser: spectrum_analyser,
+    spectrum_analyser: SpectrumAnalyser,
     lower_power_limit: float,
     upper_power_limit: float,
     ref_level: float,

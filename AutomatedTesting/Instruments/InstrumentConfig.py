@@ -29,11 +29,11 @@ resource_manager = ResourceManager("@py")
 
 logger = logging.getLogger("m0wut_automated_testing")
 logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Console Logging
 logging_handler = logging.StreamHandler()
-logging_handler.setLevel(logging.INFO)
+logging_handler.setLevel(logging.DEBUG)
 logging_handler.setFormatter(logging_format)
 logger.addHandler(logging_handler)
 
@@ -110,9 +110,9 @@ psu4 = SiglentSPD3303X(
 
 ssa3032x = SiglentSSA3032XPlus(
     resource_manager=resource_manager,
-    visa_address="TCPIP::10.59.73.133::INSTR",
+    visa_address="TCPIP::ssa3021x.secure.shack.m0wut.com::INSTR",
     name="Siglent SSA3032X+",
-    expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.5.1R1.r5",  # noqa E501
+    expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.6.3R2.r2",  # noqa E501
     verify=True,
     logger=logger,
 )

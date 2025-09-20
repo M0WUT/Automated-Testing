@@ -1,6 +1,6 @@
 from enum import Enum, auto
 from logging import Logger
-from typing import List, Tuple
+from typing import Optional
 
 from pyvisa import ResourceManager
 
@@ -11,6 +11,24 @@ class SpectrumAnalyser(EntireInstrument):
     class SweepMode(Enum):
         SINGLE = auto()
         CONTINUOUS = auto()
+
+    class FilterType(Enum):
+        NORMAL = auto()
+        EMI = auto()
+
+    class DetectorType(Enum):
+        POSITIVE_PEAK = auto()
+        NEGATIVE_PEAK = auto()
+        AVERAGE = auto()
+        QUASI_PEAK = auto()
+
+    class TraceMode(Enum):
+        CLEAR_WRITE = auto()
+        MAX_HOLD = auto()
+        MIN_HOLD = auto()
+        VIEW = auto()
+        BLANK = auto()
+        AVERAGE = auto()
 
     def __init__(
         self,
@@ -29,6 +47,12 @@ class SpectrumAnalyser(EntireInstrument):
         min_attenuation: float,
         max_attenuation: float,
         has_preamp: bool,
+        supported_rbw: list[int],
+        supported_vbw: list[int],
+        max_num_traces: int,
+        max_num_markers: int,
+        supports_emi_measurements: bool = True,
+        supported_emi_rbw: Optional[list[int]] = None,
         **kwargs,
     ):
         """
@@ -59,17 +83,102 @@ class SpectrumAnalyser(EntireInstrument):
         self.min_attenuation = min_attenuation
         self.max_attenuation = max_attenuation
         self.has_preamp = has_preamp
-        self.supported_rbw = []
-        self.supported_vbw = []
-        self.max_markers = 8
+        self.supported_rbw = supported_rbw
+        self.supported_vbw = supported_vbw
+        self.max_num_traces = max_num_traces
+        self.max_num_markers = max_num_markers
+        self.supports_emi_measurements = supports_emi_measurements
+        if self.supports_emi_measurements:
+            assert supported_emi_rbw is not None
+        self.supported_emi_rbw = supported_emi_rbw
 
     def __enter__(self):
         super().__enter__()
         self.set_sweep_mode(self.SweepMode.SINGLE)
+        for x in range(1, self.max_num_traces + 1):
+            self.disable_trace(x)
+        for x in range(1, self.max_num_markers + 1):
+            self.set_marker_enabled_state(x, False)
 
     def __exit__(self, *args, **kwargs):
         self.set_sweep_mode(self.SweepMode.CONTINUOUS)
         super().__exit__(*args, **kwargs)
+
+    def enable_marker(self, marker_number: int = 1):
+        self.set_marker_enabled_state(marker_number, True)
+
+    def disable_marker(self, marker_number: int = 1):
+        self.set_marker_enabled_state(marker_number, False)
+
+    def measure_power(self, freq: float, marker_number: int = 1) -> float:
+        """
+        Measure power at a certain frequency by placing a
+        marker and reporting the value
+
+        Args:
+            freq (float): frequency in Hz
+
+        Returns:
+            float: power in dBm
+
+        Raises:
+            ValueError: If <freq> is not within the trace data
+        """
+        if marker_number > self.max_num_markers:
+            raise ValueError
+        if not self.get_marker_enabled_state(marker_number):
+            self.enable_marker(marker_number)
+        self.set_marker_frequency(freq, marker_number)
+        return self.measure_marker_power(marker_number)
+
+    def disable_trace(self, trace_num: int):
+        """
+        Removes a trace from the display.
+
+        Args:
+            trace_num (int): which trace to get the state of
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.set_trace_mode(trace_num, SpectrumAnalyser.TraceMode.BLANK)
+
+    def set_rbw(self, rbw: float, filter_type: FilterType = FilterType.NORMAL):
+        """
+        Sets Resolution Bandwidth (RBW)
+
+        Args:
+            rbw (float): RBW in Hz
+            filter_type (FilterType): type of filter the detector is using
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If requested RBW isn't in supported list
+            AssertionError: If readback value doesn't match requested
+        """
+        if filter_type == self.FilterType.EMI:
+            if not self.supports_emi_measurements:
+                raise ValueError
+            if rbw not in self.supported_emi_rbw:
+                raise ValueError
+        else:
+            if rbw not in self.supported_rbw:
+                raise ValueError
+
+        self._set_filter_type(filter_type)
+        self._set_rbw(rbw)
+        if self.verify:
+            assert self.get_filter_type() == filter_type
+            assert self.get_rbw() == rbw
+
+    ########################################################
+    # Methods that must be implemented for each instrument #
+    ########################################################
 
     def set_start_freq(self, freq: float):
         """
@@ -210,9 +319,13 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def set_rbw(self, rbw: float):
+    def _set_rbw(self, rbw: float):
         """
-        Sets Resolution Bandwidth (RBW)
+        Low-level function that purely handles the transaction with the
+        spectrum analyser. All validation and error checking is handled
+        in the set_rbw function that calls this one, allowing automatic
+        implementation for all spectrum analyser that inherit from this
+        class
 
         Args:
             rbw (float): RBW in Hz
@@ -221,8 +334,8 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Raises:
-            ValueError: If requested RBW isn't in supported list
-            AssertionError: If readback value doesn't match requested
+            None
+
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -422,7 +535,7 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_trace_data(self) -> List[Tuple[float, float]]:
+    def get_trace_data(self) -> list[tuple[float, float]]:
         """
         Returns trace data
 
@@ -437,7 +550,7 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
+    def set_marker_enabled_state(self, marker_num: int = 1, enabled: bool = False):
         """
         En/disables a marker
 
@@ -454,7 +567,7 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_marker_state(self, marker_number: int = 1) -> bool:
+    def get_marker_enabled_state(self, marker_num: int = 1) -> bool:
         """
         Returns state of a particular marker
 
@@ -468,12 +581,6 @@ class SpectrumAnalyser(EntireInstrument):
             None
         """
         raise NotImplementedError  # pragma: no cover
-
-    def enable_marker(self, marker_number: int = 1):
-        self.set_marker_state(marker_number, True)
-
-    def disable_marker(self, marker_number: int = 1):
-        self.set_marker_state(marker_number, False)
 
     def set_marker_frequency(self, freq: float, marker_number: int = 1):
         """
@@ -522,27 +629,6 @@ class SpectrumAnalyser(EntireInstrument):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def measure_power(self, freq: float, marker_number: int = 1) -> float:
-        """
-        Measure power at a certain frequency by placing a
-        marker and reporting the value
-
-        Args:
-            freq (float): frequency in Hz
-
-        Returns:
-            float: power in dBm
-
-        Raises:
-            ValueError: If <freq> is not within the trace data
-        """
-        if marker_number > self.max_markers:
-            raise ValueError
-        if not self.get_marker_state(marker_number):
-            self.enable_marker(marker_number)
-        self.set_marker_frequency(freq, marker_number)
-        return self.measure_marker_power(marker_number)
-
     def trigger_sweep(self):
         """
         Triggers a sweep and blocks until completion
@@ -556,4 +642,41 @@ class SpectrumAnalyser(EntireInstrument):
         Raises:
             None
         """
+        raise NotImplementedError  # pragma: no cover
+
+    def set_trace_mode(self, trace_num: int, mode: TraceMode):
+        """
+        Sets the mode of a trace
+
+        Args:
+            trace_num (int): Number of trace to set state of
+            enabled (bool): True will enable the trace
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_trace_mode(self, trace_num: int) -> TraceMode:
+        """
+        Returns the mode of a trace
+
+        Args:
+            trace_num (int): Number of trace to get state of
+
+        Returns:
+            TraceMode: mode of requested trace
+
+        Raises:
+            None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_filter_type(self, filter_type: FilterType):
+        raise NotImplementedError  # pragma: no cover
+
+    def get_filter_type(self) -> FilterType:
         raise NotImplementedError  # pragma: no cover
