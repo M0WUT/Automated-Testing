@@ -41,7 +41,7 @@ class Agilent34401A(DigitalMultimeter):
         sleep(self.CONFIGURATION_DELAY)
 
     def configure_diode_voltage(self):
-        self._write(f"CONF:DIOD")
+        self._write("CONF:DIOD")
         sleep(self.CONFIGURATION_DELAY)
 
     def measure_value(self) -> float:

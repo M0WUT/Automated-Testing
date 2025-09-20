@@ -1,32 +1,28 @@
 import logging
-import signal
 import sys
 import time
-from typing import Dict
+import signal
 
 from pyvisa import ResourceManager
 from pyvisa.constants import StopBits
 
-from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
 from AutomatedTesting.Instruments.Oscilloscope.Keysight_MSOX2024A import (
-    Keysight_MSOX2024A,
+    KeysightMSOX2024A,
 )
-from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import Agilent_U2001A
-from AutomatedTesting.Instruments.PowerSupply.Siglent_SPD3303X import Siglent_SPD3303X
-from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import (
-    Tenma_72_2535,
-    Tenma_72_2940,
-)
-from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import Agilent_E4433B
+from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import AgilentU2001A
+from AutomatedTesting.Instruments.PowerSupply.Siglent_SPD3303X import SiglentSPD3303X
+from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import Tenma722535, Tenma722940
+from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import AgilentE4433B
 from AutomatedTesting.Instruments.SignalGenerator.RohdeAndSchwarz_SMB100A import (
-    RohdeAndSchwarz_SMB100A,
+    RohdeAndSchwarzSMB100A,
 )
 from AutomatedTesting.Instruments.SignalGenerator.Siglent_SDG2122X import (
-    Siglent_SDG2122X,
+    SiglentSDG2122X,
 )
 from AutomatedTesting.Instruments.SpectrumAnalyser.Siglent_SSA3032XPlus import (
-    Siglent_SSA3032XPlus,
+    SiglentSSA3032XPlus,
 )
 
 resource_manager = ResourceManager("@py")
@@ -47,7 +43,7 @@ logger.addHandler(logging_handler)
 # loggingFileHandler.setFormatter(loggingFormat)
 # logger.addHandler(loggingFileHandler)
 
-sdg2122x = Siglent_SDG2122X(
+sdg2122x = SiglentSDG2122X(
     resource_manager=resource_manager,
     visa_address="TCPIP::10.59.73.11::INSTR",
     name="Siglent SDG2122X",
@@ -56,16 +52,16 @@ sdg2122x = Siglent_SDG2122X(
     logger=logger,
 )
 
-u2001a = Agilent_U2001A(
+u2001a = AgilentU2001A(
     resource_manager=resource_manager,
     visa_address="USB0::2391::11032::MY53150007::0::INSTR",
     name="Agilent U2001A",
-    expected_idn_response="Agilent Technologies,U2001A,MY53150007,A1.03.05",
+    expected_idn_response="Agilent Technologies,U2001A,MY53150007,A1.03.05",  # noqa E501
     verify=True,
     logger=logger,
 )
 
-e4433b = Agilent_E4433B(
+e4433b = AgilentE4433B(
     resource_manager=resource_manager,
     visa_address="ASRL/dev/serial/by-id/usb-FTDI_USB-RS232_Cable_FT4WIYQP-if00-port0::INSTR",  # noqa E501
     name="Agilent E4433B",
@@ -85,7 +81,7 @@ dmm = Agilent34401A(
     stop_bits=StopBits.two,
 )
 
-psu2 = Tenma_72_2535(
+psu2 = Tenma722535(
     resource_manager=resource_manager,
     visa_address="ASRL/dev/serial/by-id/usb-Nuvoton_USB_Virtual_COM_A02014090305-if00::INSTR",  # noqa E501
     name="Tenma 72-2535",
@@ -94,7 +90,7 @@ psu2 = Tenma_72_2535(
     logger=logger,
 )
 
-psu3 = Tenma_72_2940(
+psu3 = Tenma722940(
     resource_manager=resource_manager,
     visa_address="ASRL/dev/serial/by-id/usb-Nuvoton_USB_Virtual_COM_001461000452-if00::INSTR",  # noqa E501
     name="Tenma 72-2940",
@@ -103,53 +99,41 @@ psu3 = Tenma_72_2940(
     logger=logger,
 )
 
-psu4 = Siglent_SPD3303X(
+psu4 = SiglentSPD3303X(
     resource_manager=resource_manager,
     visa_address="TCPIP::10.59.73.57::INSTR",
     name="Siglent SPD3303X",
-    expected_idn_response="Siglent Technologies,SPD3303X,SPD3XIEX6R2056,1.01.01.02.07R2,V3.0",
+    expected_idn_response="Siglent Technologies,SPD3303X,SPD3XIEX6R2056,1.01.01.02.07R2,V3.0",  # noqa E501
     verify=True,
     logger=logger,
 )
 
-ssa3032x = Siglent_SSA3032XPlus(
+ssa3032x = SiglentSSA3032XPlus(
     resource_manager=resource_manager,
     visa_address="TCPIP::10.59.73.133::INSTR",
     name="Siglent SSA3032X+",
-    expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.5.1R1.r5",
+    expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.5.1R1.r5",  # noqa E501
     verify=True,
     logger=logger,
 )
 
-scope = Keysight_MSOX2024A(
+scope = KeysightMSOX2024A(
     resource_manager=resource_manager,
     visa_address="TCPIP::10.59.73.194::INSTR",
     name="Keysight MSOX2024A",
-    expected_idn_response="AGILENT TECHNOLOGIES,MSO-X 2024A,MY56040858,02.41.2015102200",
+    expected_idn_response="AGILENT TECHNOLOGIES,MSO-X 2024A,MY56040858,02.41.2015102200",  # noqa E501
     verify=True,
     logger=logger,
 )
 
-smb100a = RohdeAndSchwarz_SMB100A(
+smb100a = RohdeAndSchwarzSMB100A(
     resource_manager=resource_manager,
     visa_address="TCPIP::10.59.73.10::INSTR",
     name="R&S SMB100A",
-    expected_idn_response="Rohde&Schwarz,SMB100A,1406.6000k03/180437,3.1.19.15-3.20.390.24",
+    expected_idn_response="Rohde&Schwarz,SMB100A,1406.6000k03/180437,3.1.19.15-3.20.390.24",  # noqa E501
     verify=True,
     logger=logger,
 )
-
-
-def check_online_instruments(instrument_list: list[BaseInstrument]) -> Dict[str, bool]:
-    """
-    Returns a dictionary of instrument name to status
-    (True means responding to connections)
-    """
-    status_dict = {}
-    for instrument in instrument_list:
-        status_dict[instrument.name] = instrument.test_connection()
-
-    return status_dict
 
 
 # Attach handler to signal thrown by any error monitoring thread
@@ -158,7 +142,7 @@ def panic(*args, **kwargs):
     sys.exit(1)
 
 
-signal.signal(signal.SIGUSR1, panic)
+signal.signal(signal.SIGTERM, panic)
 
 
 def main():

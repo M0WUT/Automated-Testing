@@ -6,7 +6,7 @@ from AutomatedTesting.Instruments.PowerMeter.PowerMeter import PowerMeter
 from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 
 
-class Agilent_U2001A(PowerMeter):
+class AgilentU2001A(PowerMeter):
     def __init__(
         self,
         resource_manager: ResourceManager,

@@ -1,12 +1,13 @@
+# Standard imports
 import math
 
+# Third party imports
 import pytest
-import pyvisa
 
+# Local imports
 from AutomatedTesting.Instruments.InstrumentConfig import ssa3032x
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    SpectrumAnalyser,
-)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
+    SpectrumAnalyser
 
 
 @pytest.fixture

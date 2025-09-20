@@ -1,17 +1,17 @@
+# Standard imports
 import logging
 from time import sleep
-from typing import List, Tuple
 
-from pyvisa import ResourceManager, VisaIOError
+from pyvisa import ResourceManager
 
-from AutomatedTesting.Instruments.MultichannelInstrument import InstrumentChannel
+# Third party imports
 from AutomatedTesting.Instruments.PowerSupply.PowerSupply import (
-    PowerSupply,
-    PowerSupplyChannel,
-)
+    PowerSupply, PowerSupplyChannel)
+
+# Local imports
 
 
-class Siglent_SPD3303X(PowerSupply):
+class SiglentSPD3303X(PowerSupply):
     # Bit masks for status byte
     CHANNEL1_MODE_BIT = 0
     CHANNEL2_MODE_BIT = 1
@@ -177,7 +177,7 @@ class Siglent_SPD3303X(PowerSupply):
         else:
             return status[self.CHANNEL2_STATUS] == "1"
 
-    def _get_status_byte(self) -> int:
+    def _get_status_byte(self) -> str:
         # Get status byte and convert to string in reverse
         # order so status[0] = bit 0
         response = self._query("SYST:STATUS?")

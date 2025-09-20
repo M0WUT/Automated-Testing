@@ -1,16 +1,15 @@
+# Standard imports
 import logging
-from typing import List, Tuple
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
-    SignalGenerator,
-    SignalGeneratorChannel,
-    SignalGeneratorModulation,
-)
+    SignalGenerator, SignalGeneratorChannel, SignalGeneratorModulation)
 
 
-class Agilent_E4433B(SignalGenerator):
+class AgilentE4433B(SignalGenerator):
     """
     Class for Agilent E4433B
     """
@@ -56,7 +55,7 @@ class Agilent_E4433B(SignalGenerator):
         assert test_result == "+0", test_result
         return self
 
-    def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
+    def get_channel_errors(self, channel_number: int) -> list[tuple[int, str]]:
         return []  # Doesn't have channel specific errors
 
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):

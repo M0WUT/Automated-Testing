@@ -1,13 +1,16 @@
+# Standard imports
 import logging
 import os
-import re
 import signal
 from multiprocessing import Lock, Process
 from time import sleep
 from typing import List, Tuple
 
+# Third party imports
 from pyvisa import ResourceManager, VisaIOError
 from serial import SerialException
+
+# Local imports
 
 
 class InstrumentConnectionError(Exception):
@@ -65,11 +68,10 @@ class BaseInstrument:
         self.open_connection()
         self.logger.info(f"Connected to {self.name}")
 
-        # Reset the Device and start error monitoring thread only if only under software control
-        # (as opposed to being used interactively)
+        # Reset the Device and start error monitoring thread only if only
+        #  under software control (as opposed to being used interactively)
         if self.only_software_control:
             self.reset()
-
             self.error_process = Process(
                 target=self.check_instrument_errors, args=[os.getpid()], daemon=True
             )
@@ -109,32 +111,12 @@ class BaseInstrument:
         self.set_remote_control()
 
         # Check device ID to ensure we're connecting the right thing
-        idnString = self.query_id()
-        assert idnString == self.expected_idn_response, (
+        idn_string = self.query_id()
+        assert idn_string == self.expected_idn_response, (
             f"Unexpected IDN response from {self.name}. "
             f'Expected response: "{self.expected_idn_response}", '
-            f'Received response: "{idnString}"'
+            f'Received response: "{idn_string}"'
         )
-
-    def test_connection(self) -> bool:
-        """
-        Tests whether the instruments can be connected to.
-        Return True if this is possible
-        """
-        try:
-            self.open_connection()
-            return True
-        except (InstrumentConnectionError, VisaIOError):
-            return False
-        finally:
-            if self.dev:
-                # Just in case the instrument automatically goes to remote
-                self.set_local_control()
-                self.dev.close()
-
-    def is_connected(self) -> bool:
-        """Returns True if connected to the instrument"""
-        return bool(self.dev)
 
     def set_remote_control(self):
         """
@@ -167,7 +149,7 @@ class BaseInstrument:
                     )
 
                 # Inform main thread
-                os.kill(pid, signal.SIGUSR1)
+                os.kill(pid, signal.SIGTERM)
 
     def get_instrument_errors(self) -> List[Tuple[int, str]]:
         """
@@ -204,41 +186,43 @@ class BaseInstrument:
             pass
         self._write("*CLS")
 
-    def _write(self, x: str, acquireLock: bool = True):
+    def _write(self, x: str, acquire_lock: bool = True):
         """
         Blocks until device is available, then writes to the device
 
-        acquireLock specifys whether this function should
+        acquire_lock specifys whether this function should
         acquire the lock itself (e.g. when used with query,
         the lock will have already been acquired)
         """
-        if acquireLock:
+        assert self.dev is not None
+
+        if acquire_lock:
             self.lock.acquire()
             try:
-                self.dev.write(x)
+                self.dev.write(x)  # type: ignore
             finally:
                 self.lock.release()
         else:
-            self.dev.write(x)
+            self.dev.write(x)  # type: ignore
         self.logger.debug(f"[{self.instrument_name}] SENT:  {x}")
 
-    def _read(self, acquireLock: bool = True) -> str:
+    def _read(self, acquire_lock: bool = True) -> str:
         """
         Blocks until device is available, then reads a line
         from the device
 
-        acquireLock specifys whether this function should
+        acquire_lock specifys whether this function should
         acquire the lock itself (e.g. when used with query,
         the lock will have already been acquired)
         """
-        if acquireLock:
+        if acquire_lock:
             self.lock.acquire()
             try:
-                result = self.dev.read().strip()
+                result = self.dev.read().strip()  # type: ignore
             finally:
                 self.lock.release()
         else:
-            result = self.dev.read().strip()
+            result = self.dev.read().strip()  # type: ignore
 
         self.logger.debug(f"[{self.instrument_name}] RCVD: {result}")
         return result
@@ -249,8 +233,8 @@ class BaseInstrument:
         """
         self.lock.acquire()
         try:
-            self._write(command, acquireLock=False)
-            response = self._read(acquireLock=False)
+            self._write(command, acquire_lock=False)
+            response = self._read(acquire_lock=False)
         finally:
             self.lock.release()
         return response

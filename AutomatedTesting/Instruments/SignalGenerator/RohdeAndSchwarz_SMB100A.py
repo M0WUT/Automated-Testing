@@ -1,8 +1,10 @@
+# Standard imports
 import logging
-from typing import List, Tuple
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
     SignalGenerator,
     SignalGeneratorChannel,
@@ -10,7 +12,7 @@ from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
 )
 
 
-class RohdeAndSchwarz_SMB100A(SignalGenerator):
+class RohdeAndSchwarzSMB100A(SignalGenerator):
     """
     Class for Rohde & Schwarz SMB100A
     """
@@ -30,7 +32,7 @@ class RohdeAndSchwarz_SMB100A(SignalGenerator):
             instrument=self,
             logger=logger,
             max_power=30,
-            min_power=-120,  # Instrument can technically go down to -135dBm but only in specific circumstances
+            min_power=-120,  # Instrument can go down to -135dBm but not always
             max_freq=12.75e9,
             min_freq=100e3,
         )
@@ -53,7 +55,7 @@ class RohdeAndSchwarz_SMB100A(SignalGenerator):
     def initialise(self):
         super().initialise()
 
-    def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
+    def get_channel_errors(self, channel_number: int) -> list[tuple[int, str]]:
         return []  # Doesn't have channel specific errors
 
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):

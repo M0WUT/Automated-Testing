@@ -1,16 +1,14 @@
+# flake8: noqa
+
 import math
 import sys
 from time import sleep
 
 from numpy import logspace
 
-from AutomatedTesting.Instruments.InstrumentConfig import (
-    dmm,
-    e4433b,
-    sdg2122x,
-    smb100a,
-    ssa3032x,
-)
+from AutomatedTesting.Instruments.InstrumentConfig import (dmm, e4433b,
+                                                           sdg2122x, smb100a,
+                                                           ssa3032x)
 from AutomatedTesting.Tests.GainFlatnessPAE import run_gain_flatness_test
 from AutomatedTesting.Tests.IMD_Full import run_imd_test
 

@@ -12,3 +12,4 @@ linux-gpib/*
 **/*.egg-info
 *.out
 *.csv
+scratchpad.py

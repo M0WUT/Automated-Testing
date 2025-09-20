@@ -23,7 +23,7 @@ ALLOWED_VOLTS_PER_DIV = [
 ]
 
 
-class Keysight_MSOX2024A(Oscilloscope):
+class KeysightMSOX2024A(Oscilloscope):
     def __init__(
         self,
         resource_manager: ResourceManager,

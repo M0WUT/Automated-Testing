@@ -1,4 +1,3 @@
-from copy import copy
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -8,12 +7,13 @@ from scipy import stats
 
 def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -> str:
     """
-    Converts a value to use prefixes (and optionally round to a certain number of decimal places)
+    Converts a value to use prefixes
+    (and optionally round to a certain number of decimal places)
     """
 
-    AGILENT_OVERLOAD_MAGIC_NUMBER = 9.9e37
+    agilent_overload_magic_number = 9.9e37
 
-    SI_PREFIXES = {
+    si_prefixes = {
         1e12: "P",
         1e9: "G",
         1e6: "M",
@@ -23,21 +23,23 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
         1e-6: "μ",
         1e-9: "n",
         1e-12: "p",
+        1e-15: "f",
     }
 
-    if x == AGILENT_OVERLOAD_MAGIC_NUMBER:
+    if x == agilent_overload_magic_number:
         return "OVLD"
 
-    for exponent, prefix in SI_PREFIXES.items():
+    for exponent, prefix in si_prefixes.items():
         if x >= exponent:
             x /= exponent
 
             if decimal_places:
                 x = round(x, decimal_places)
-            x = str(x)
-            x.removesuffix(".0")
+            result = str(x)
+            result.removesuffix(".0")
 
-            return f"{x}{prefix}{units}"
+            return f"{result}{prefix}{units}"
+    raise ValueError(f"Could not convert {x} to SI notation")
 
 
 def readable_freq(freq: float) -> str:
@@ -55,7 +57,7 @@ class StraightLine:
 
 
 def intercept_point(a: StraightLine, b: StraightLine) -> Tuple[float, float]:
-    """Takes two straight lines and returns the x and y coordinates that that intercept"""
+    """Takes two straight lines and returns the x and y coordinates that intercept"""
     assert a.gradient != b.gradient, "Two parallel lines will never intercept"
     x = (b.intercept - a.intercept) / (a.gradient - b.gradient)
     y = a.evaluate(x)
@@ -64,48 +66,51 @@ def intercept_point(a: StraightLine, b: StraightLine) -> Tuple[float, float]:
 
 
 def best_fit_line_with_known_gradient(
-    xValues: List[float],
-    yValues: List[float],
-    expectedGradient: float = 3,
-    maxErrorPercentage: float = 3,
+    x_values: List[float],
+    y_values: List[float],
+    expected_gradient: float = 3,
+    max_error_percentage: float = 3,
     window_size: int = 11,
 ) -> StraightLine:
     """
     Takes a list of y and x values, attempts to find line by removing data
     from whichever ends has gradient furthest from expected
     """
-    assert len(xValues) == len(yValues)
+    assert len(x_values) == len(y_values)
     if window_size % 2 == 0:
         raise NotImplementedError("Only supports odd window sizes")
-    x = numpy.array(xValues)
-    y = numpy.array(yValues)
+    x = numpy.array(x_values)
+    y = numpy.array(y_values)
     gradients = []
 
     for end_index in range(window_size, len(y) + 1):
         x_values_in_window = x[end_index - window_size : end_index]
         y_values_in_window = y[end_index - window_size : end_index]
-        slope = stats.linregress(x_values_in_window, y_values_in_window).slope
+        slope = stats.linregress(
+            x_values_in_window, y_values_in_window
+        ).slope  # pyright: ignore[reportAttributeAccessIssue]
         gradients.append(slope)
 
     x = x[int(window_size / 2) :]  # Remove lost values of x at the start
     y = y[int(window_size / 2) :]  # Remove lost values of x at the start
 
-    # Now need to find longest sub-list where the gradient over the window is within 20% of target
+    # Now need to find longest sub-list where the gradient over the
+    # window is within 20% of target
     best_start_index = 0
     best_length = 0
     for start_index in range(0, len(gradients)):
         sub_list_length = 0
         while (start_index + sub_list_length < len(gradients)) and (
-            0.8 * expectedGradient
+            0.8 * expected_gradient
             <= gradients[start_index + sub_list_length]
-            <= 1.2 * expectedGradient
+            <= 1.2 * expected_gradient
         ):
             sub_list_length += 1
         if sub_list_length > best_length:
             best_start_index = start_index
             best_length = sub_list_length
 
-    # if expectedGradient == 3:
+    # if expected_gradient == 3:
     #     print(x)
     #     print(gradients)
     #     print(best_start_index)
@@ -117,23 +122,23 @@ def best_fit_line_with_known_gradient(
 
     # Now confirm gradient across whole lot and trim if necessary
     while len(x) > 4:
-        # if expectedGradient == 3:
+        # if expected_gradient == 3:
         #     print(x)
         #     print(y)
         gradient, intercept, _, _, _ = stats.linregress(x, y)
         if (
-            (1 - maxErrorPercentage / 100) * expectedGradient
+            (1 - max_error_percentage / 100) * expected_gradient
             <= gradient
-            <= (1 + maxErrorPercentage / 100) * expectedGradient
+            <= (1 + max_error_percentage / 100) * expected_gradient
         ):
-            return StraightLine(expectedGradient, round(intercept, 4))
+            return StraightLine(expected_gradient, round(intercept, 4))
         else:
             # Work out slope if remove top or bottom element
             gradient_with_lowest_removed = stats.linregress(x[1:], y[1:]).slope
             gradient_with_highest_removed = stats.linregress(x[:-1], y[:-1]).slope
 
-            if abs(gradient_with_highest_removed - expectedGradient) < abs(
-                gradient_with_lowest_removed - expectedGradient
+            if abs(gradient_with_highest_removed - expected_gradient) < abs(
+                gradient_with_lowest_removed - expected_gradient
             ):
                 x = x[:-1]
                 y = y[:-1]

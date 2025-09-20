@@ -4,12 +4,11 @@ from typing import List, Tuple
 from numpy import linspace
 from pyvisa import ResourceManager
 
-from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
-    SpectrumAnalyser,
-)
+from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import \
+    SpectrumAnalyser
 
 
-class Siglent_SSA3032XPlus(SpectrumAnalyser):
+class SiglentSSA3032XPlus(SpectrumAnalyser):
     def __init__(
         self,
         resource_manager: ResourceManager,
@@ -150,9 +149,12 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
         return float(self._query(":BWID:VID:RAT?"))
 
     def set_sweep_mode(
-        self, mode: SpectrumAnalyser.SweepMode = SpectrumAnalyser.SweepMode.CONTINUOUS
+        self,
+        mode: SpectrumAnalyser.SweepMode = SpectrumAnalyser.SweepMode.CONTINUOUS,
     ):
-        self._write(f":INIT:CONT {'1' if mode == self.SweepMode.CONTINUOUS else '0'}")
+        self._write(
+            f":INIT:CONT {'1' if mode == self.SweepMode.CONTINUOUS else '0'}"
+        )
         if self.verify:
             assert self.get_sweep_mode() == mode
 
@@ -173,8 +175,6 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
         return 751
 
     def set_input_attenuation(self, attenuation: float):
-        if attenuation == 0:
-            self.logger.warning("Setting input attenuation to 0dB")
         if not (self.min_attenuation <= attenuation <= self.max_attenuation):
             raise ValueError
         self._write(f":POW:ATT {attenuation}")
@@ -192,7 +192,7 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
     def get_ref_level(self) -> float:
         return float(self._query(":DISP:WIND:TRAC:Y:RLEV?"))
 
-    def get_trace_data(self) -> List[float]:
+    def get_trace_data(self) -> list[tuple[float, float]]:
         data = self._query(":TRAC:DATA?")
         powers = [float(x) for x in data.split(",")]
         freqs = linspace(
@@ -203,7 +203,9 @@ class Siglent_SSA3032XPlus(SpectrumAnalyser):
     def set_marker_state(self, marker_number: int = 1, enabled: bool = False):
         if marker_number > self.max_markers:
             raise ValueError
-        self._write(f":CALC:MARK{marker_number}:STAT {'ON' if enabled else 'OFF'}")
+        self._write(
+            f":CALC:MARK{marker_number}:STAT {'ON' if enabled else 'OFF'}"
+        )
         if self.verify:
             assert self.get_marker_state(marker_number) == enabled
 

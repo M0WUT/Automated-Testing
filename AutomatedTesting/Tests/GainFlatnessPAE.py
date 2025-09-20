@@ -1,8 +1,7 @@
 import pickle
 from dataclasses import dataclass
-from math import log10
 from time import sleep
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import xlsxwriter
 
@@ -40,7 +39,7 @@ def run_gain_flatness_test(
     supply_voltage: float = 5,
     loss_before_dut: float = 0.2,
     loss_after_dut: float = 0.5,
-    pickle_file: str = None,
+    pickle_file: Optional[str] = None,
     excel_workbook: Optional[xlsxwriter.workbook.Workbook] = None,
 ):
     if pickle_file is None:
@@ -95,12 +94,12 @@ def run_gain_flatness_test(
                 )
 
         # Save results
-        with open("pae.P", "wb") as pickleFile:
-            pickle.dump(results, pickleFile)
+        with open("pae.P", "wb") as pickle_file:
+            pickle.dump(results, pickle_file)
     else:
         # Load results from file
-        with open(pickle_file, "rb") as savedData:
-            results = pickle.load(savedData)
+        with open(pickle_file, "rb") as saved_data:
+            results = pickle.load(saved_data)
 
     # We've got results, now process them
     if excel_workbook:

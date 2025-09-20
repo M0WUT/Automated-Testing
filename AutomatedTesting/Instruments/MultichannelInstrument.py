@@ -13,7 +13,8 @@ class InstrumentChannel:
     def __init__(
         self,
         channel_number: int,
-        instrument: BaseInstrument,
+        # Can't type hint as creates a circular reference
+        instrument,  # : MultichannelInstrument,
         logger: logging.Logger,
     ):
         """
@@ -37,10 +38,10 @@ class InstrumentChannel:
         assert (
             self.reserved is False
         ), f"Requested channel is already reserved for {self.name}"
-        oldName = self.name
+        old_name = self.name
         self.name = purpose
         self.reserved = True
-        self.logger.debug(f"{oldName} assigned to {self.name}")
+        self.logger.debug(f"{old_name} assigned to {self.name}")
         return self
 
     def free(self):
@@ -48,10 +49,10 @@ class InstrumentChannel:
         if self.monitor_process.is_alive():
             self.monitor_process.terminate()
             self.monitor_process.join(2)
-        oldName = self.name
+        old_name = self.name
         self.name = f"{self.instrument.name} - Channel {self.channel_number}"
         self.reserved = False
-        self.logger.debug(f"{self.name} released from role as {oldName}")
+        self.logger.debug(f"{self.name} released from role as {old_name}")
 
     def check_channel_errors(self, pid: int):
         """
@@ -61,16 +62,16 @@ class InstrumentChannel:
         self.logger.debug(f"Started error monitoring thread for {self.name}")
         while True:
             sleep(3)
-            errorList = self.instrument.get_channel_errors(self.channel_number)
-            if errorList:
-                for errorCode, errorMessage in errorList:
+            error_list = self.instrument.get_channel_errors(self.channel_number)
+            if error_list:
+                for error_code, error_message in error_list:
                     self.logger.error(
                         f"{self.name} reporting error "
-                        f"{errorCode} ({errorMessage}). Shutting down..."
+                        f"{error_code} ({error_message}). Shutting down..."
                     )
 
                 # Inform main thread
-                os.kill(pid, signal.SIGUSR1)
+                os.kill(pid, signal.SIGTERM)
 
     def set_output_enabled_state(self, enabled: bool = True):
         if enabled:
@@ -168,6 +169,12 @@ class MultichannelInstrument(BaseInstrument):
                 x.cleanup()
         super().cleanup()
 
+    def validate_channel_number(self, channel_number: int):
+        if not 1 <= channel_number <= self.channel_count:
+            raise ValueError(
+                f"Invalid channel number {channel_number} requested for {self.name}"
+            )
+
     def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
         raise NotImplementedError
 
@@ -179,9 +186,6 @@ class MultichannelInstrument(BaseInstrument):
 
     def disable_channel_output(self, channel_number: int):
         self.set_channel_output_enabled_state(channel_number, False)
-
-    def validate_channel_number(self, number: int):
-        assert number in list(range(1, self.channel_count + 1))
 
     def reserve_channel(self, channel_number: int, purpose: str) -> InstrumentChannel:
         self.validate_channel_number(channel_number)

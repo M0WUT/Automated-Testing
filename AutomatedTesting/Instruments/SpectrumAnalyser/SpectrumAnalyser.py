@@ -45,9 +45,9 @@ class SpectrumAnalyser(EntireInstrument):
             **kwargs,
         )
         if (
-            max_freq < min_freq
-            or max_sweep_points < min_sweep_points
-            or max_span < min_span
+            (max_freq < min_freq)
+            or (max_sweep_points < min_sweep_points)
+            or (max_span < min_span)
         ):
             raise ValueError
         self.min_freq = min_freq

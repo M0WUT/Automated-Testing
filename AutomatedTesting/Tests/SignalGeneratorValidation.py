@@ -12,39 +12,39 @@ MIN_POWER = -60
 MAX_POWER = 13
 STEP = 1
 
-powerSteps = list(range(MIN_POWER, MAX_POWER + 1, STEP))
+power_steps = list(range(MIN_POWER, MAX_POWER + 1, STEP))
 
 results = {}
 
-pickleFile = ""  # "imdTest.P"
+pickle_file = ""  # "imdTest.P"
 
-if pickleFile:
-    with open(pickleFile, "rb") as savedData:
-        results = pickle.load(savedData)
+if pickle_file:
+    with open(pickle_file, "rb") as saved_data:
+        results = pickle.load(saved_data)
 else:
-    results[0] = powerSteps
-    with e4433b as sigGen, u2001a as powerMeter:
-        testSource = sigGen.reserve_channel(1, "Test Source")
-        powerMeter.reserve("Power Meter")
-        testSource.enable_output()
-        testSource.set_soft_power_limits(-60, 13)
+    results[0] = power_steps
+    with e4433b as sig_gen, u2001a as power_meter:
+        test_source = sig_gen.reserve_channel(1, "Test Source")
+        power_meter.reserve("Power Meter")
+        test_source.enable_output()
+        test_source.set_soft_power_limits(-60, 13)
         for freq in [10e6, 50e6, 100e6, 500e6, 1e9, 2e9, 4e9, 6e9]:
-            singleFreqResults = []
-            testSource.set_freq(freq)
-            powerMeter.set_freq(freq)
-            for power in powerSteps:
-                testSource.set_power(power)
+            single_freq_results = []
+            test_source.set_freq(freq)
+            power_meter.set_freq(freq)
+            for power in power_steps:
+                test_source.set_power(power)
                 sleep(1)
-                singleFreqResults.append(powerMeter.measure_power(freq))
-            results[freq] = singleFreqResults
+                single_freq_results.append(power_meter.measure_power(freq))
+            results[freq] = single_freq_results
     # Save results to Pickle File
-    with open("imdTest.P", "wb") as pickleFile:
-        pickle.dump(results, pickleFile)
+    with open("imdTest.P", "wb") as pickle_file:
+        pickle.dump(results, pickle_file)
 
 now = datetime.now().strftime("%Y%m%d-%H%M%S")
-resultsDirectory = "/mnt/Transit"
+results_directory = "/mnt/Transit"
 
-with Workbook(f"{resultsDirectory}/results_{now}.xlsx") as workbook:
+with Workbook(f"{results_directory}/results_{now}.xlsx") as workbook:
     worksheet = workbook.add_worksheet("Results")
     worksheet.__class__ = ExcelWorksheetWrapper
     worksheet.initialise("Results")

@@ -10,7 +10,7 @@ from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
 )
 
 
-class Siglent_SDG2122X(SignalGenerator):
+class SiglentSDG2122X(SignalGenerator):
     """
     Class for Siglent SDG2122X
     """

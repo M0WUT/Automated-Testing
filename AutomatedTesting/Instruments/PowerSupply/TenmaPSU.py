@@ -9,7 +9,7 @@ from AutomatedTesting.Instruments.PowerSupply.PowerSupply import (
     PowerSupply, PowerSupplyChannel)
 
 
-class Tenma_Generic(PowerSupply):
+class TenmaGeneric(PowerSupply):
     """
     Class for Tenma PSUs
     NB All the sleep() are really important
@@ -72,8 +72,8 @@ class Tenma_Generic(PowerSupply):
         """
         pass
 
-    def _write(self, command, acquireLock=True):
-        super()._write(command, acquireLock)
+    def _write(self, command, acquire_lock=True):
+        super()._write(command, acquire_lock)
         sleep(0.1)  # Super important - do not delete
 
     def _read(self, num_bytes=0):
@@ -289,7 +289,7 @@ class Tenma_Generic(PowerSupply):
         return []
 
 
-class Tenma_72_2535(Tenma_Generic):
+class Tenma722535(TenmaGeneric):
     def __init__(
         self,
         resource_manager: ResourceManager,
@@ -325,7 +325,7 @@ class Tenma_72_2535(Tenma_Generic):
         )
 
 
-class Tenma_72_2940(Tenma_Generic):
+class Tenma722940(TenmaGeneric):
     def __init__(
         self,
         resource_manager: ResourceManager,

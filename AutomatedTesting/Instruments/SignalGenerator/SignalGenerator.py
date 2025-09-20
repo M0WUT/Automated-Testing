@@ -122,8 +122,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")
         self.instrument.set_channel_power(self.channel_number, power)
         if self.instrument.verify:
-            readbackPower = self.get_power()
-            assert readbackPower == power
+            assert self.get_power() == power
         self.logger.debug(f"{self.name} set to {power} dBm")
 
     def get_power(self) -> float:
@@ -156,8 +155,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         if self.min_freq <= freq <= self.max_freq:
             self.instrument.set_channel_freq(self.channel_number, freq)
             if self.instrument.verify:
-                readbackFreq = self.get_freq()
-                assert readbackFreq == freq
+                assert self.get_freq() == freq
             self.logger.debug(f"{self.name} set to {readable_freq(freq)}")
 
     def get_freq(self) -> float:
