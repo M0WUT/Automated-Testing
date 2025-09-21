@@ -372,8 +372,9 @@ class SpectrumAnalyser(EntireInstrument):
             AssertionError: If readback span isn't zero
         """
         self._set_zero_span_enabled_state(enabled)
+        readback = self.get_zero_span_enabled_state()
         if self.verify:
-            assert self.get_zero_span_enabled_state() == enabled
+            assert readback == enabled
 
     def get_zero_span_enabled_state(self) -> bool:
         """
@@ -414,6 +415,9 @@ class SpectrumAnalyser(EntireInstrument):
         if filter_type == self.FilterType.EMI:
             if not self.supports_emi_measurements:
                 raise ValueError
+            # Not necessary (as validated on initialisation)
+            # but stops Pylance complaining
+            assert self.supported_emi_rbw
             if rbw_hz not in self.supported_emi_rbw:
                 raise ValueError
         else:
@@ -646,7 +650,8 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Returns:
-            list[tuple[float, float]: List of (frequency in Hz, power in y-axis units) tuples
+            list[tuple[float, float]:
+                List of (frequency in Hz, power in y-axis units) tuples
 
         Raises:
             None

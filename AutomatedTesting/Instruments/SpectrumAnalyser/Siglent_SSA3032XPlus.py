@@ -1,9 +1,11 @@
+# Standard impots
 from logging import Logger
-from typing import List, Tuple
 
+# Third party imports
 from numpy import linspace
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
@@ -123,7 +125,7 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         if enabled:
             self._write(":FREQ:SPAN:ZERO")
         else:
-            pass
+            self.set_span(self.min_span)
 
     def _get_zero_span_enabled_state(self) -> bool:
         return self.get_span() == 0

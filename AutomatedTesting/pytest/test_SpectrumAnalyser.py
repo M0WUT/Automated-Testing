@@ -11,13 +11,89 @@ from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
 )
 
 
-@pytest.fixture(scope="function")
+pytestmark = pytest.mark.parametrize("spectrum_analyser", [ssa3032x])
+
+
+@pytest.fixture()
 def sa(spectrum_analyser):
     with spectrum_analyser:
         yield spectrum_analyser
 
 
-pytestmark = pytest.mark.parametrize("spectrum_analyser", [ssa3032x])
+def test_parameter_validation(spectrum_analyser):
+    # Check max_freq < min_freq validation
+    with pytest.raises(ValueError):
+        _ = SpectrumAnalyser(
+            resource_manager=None,  # type: ignore
+            visa_address=None,  # type: ignore
+            name=None,  # type: ignore
+            expected_idn_response=None,  # type: ignore
+            verify=None,  # type: ignore
+            logger=None,  # type: ignore
+            min_freq=int(2e9),
+            max_freq=int(1e9),
+            min_num_sweep_points=10,
+            max_num_sweep_points=10,
+            min_span=10,
+            max_span=10,
+            min_attenuation_db=None,  # type: ignore
+            max_attenuation_db=None,  # type: ignore
+            has_preamp=None,  # type: ignore
+            supported_rbw=None,  # type: ignore
+            supported_vbw=None,  # type: ignore
+            max_num_traces=None,  # type: ignore
+            max_num_markers=None,  # type: ignore
+            supports_emi_measurements=None,  # type: ignore
+        )
+    # Check max_num_sweep_points < min_num_sweep_points validation
+    with pytest.raises(ValueError):
+        _ = SpectrumAnalyser(
+            resource_manager=None,  # type: ignore
+            visa_address=None,  # type: ignore
+            name=None,  # type: ignore
+            expected_idn_response=None,  # type: ignore
+            verify=None,  # type: ignore
+            logger=None,  # type: ignore
+            min_freq=int(1e9),
+            max_freq=int(2e9),
+            min_num_sweep_points=11,
+            max_num_sweep_points=10,
+            min_span=10,
+            max_span=10,
+            min_attenuation_db=None,  # type: ignore
+            max_attenuation_db=None,  # type: ignore
+            has_preamp=None,  # type: ignore
+            supported_rbw=None,  # type: ignore
+            supported_vbw=None,  # type: ignore
+            max_num_traces=None,  # type: ignore
+            max_num_markers=None,  # type: ignore
+            supports_emi_measurements=None,  # type: ignore
+        )
+
+    # Check max_span < min_span validation
+    with pytest.raises(ValueError):
+        _ = SpectrumAnalyser(
+            resource_manager=None,  # type: ignore
+            visa_address=None,  # type: ignore
+            name=None,  # type: ignore
+            expected_idn_response=None,  # type: ignore
+            verify=None,  # type: ignore
+            logger=None,  # type: ignore
+            min_freq=int(1e9),
+            max_freq=int(2e9),
+            min_num_sweep_points=10,
+            max_num_sweep_points=10,
+            min_span=11,
+            max_span=10,
+            min_attenuation_db=None,  # type: ignore
+            max_attenuation_db=None,  # type: ignore
+            has_preamp=None,  # type: ignore
+            supported_rbw=None,  # type: ignore
+            supported_vbw=None,  # type: ignore
+            max_num_traces=None,  # type: ignore
+            max_num_markers=None,  # type: ignore
+            supports_emi_measurements=None,  # type: ignore
+        )
 
 
 def test_min_freq(sa: SpectrumAnalyser):
@@ -56,24 +132,54 @@ def test_span(sa: SpectrumAnalyser):
     with pytest.raises(ValueError):
         sa.set_span(0)
     sa.enable_zero_span()
+    sa.disable_zero_span()
+    sa.set_span(sa.max_span)
 
 
 def test_rbw(sa: SpectrumAnalyser):
-    # Kinda tricky to define as it's normally a discrete list
-    # Most Spectrum Analysers will support RBW = 1MHz
-    # Most Spectrum Analyser will not support RBW = 277kHz (random number)
     sa.set_rbw(1e6)
     with pytest.raises(ValueError):
-        sa.set_rbw(277e3)
+        sa.set_rbw(int(0.5 * (sa.supported_rbw[0] + sa.supported_rbw[1])))
+    if sa.supports_emi_measurements:
+        assert sa.supported_emi_rbw and len(sa.supported_emi_rbw) >= 2
+        sa.set_rbw(sa.supported_emi_rbw[0], SpectrumAnalyser.FilterType.EMI)
+        with pytest.raises(ValueError):
+            sa.set_rbw(
+                int(0.5 * (sa.supported_emi_rbw[0] + sa.supported_emi_rbw[1])),
+                SpectrumAnalyser.FilterType.EMI,
+            )
+    # Test to setup EMI filters on spectrum analyser that doesn't support it
+    test = SpectrumAnalyser(
+        resource_manager=None,  # type: ignore
+        visa_address=None,  # type: ignore
+        name=None,  # type: ignore
+        expected_idn_response=None,  # type: ignore
+        verify=None,  # type: ignore
+        logger=None,  # type: ignore
+        min_freq=int(1e9),
+        max_freq=int(2e9),
+        min_num_sweep_points=10,
+        max_num_sweep_points=10,
+        min_span=10,
+        max_span=10,
+        min_attenuation_db=None,  # type: ignore
+        max_attenuation_db=None,  # type: ignore
+        has_preamp=None,  # type: ignore
+        supported_rbw=[1000],
+        supported_vbw=None,  # type: ignore
+        max_num_traces=None,  # type: ignore
+        max_num_markers=None,  # type: ignore
+        supports_emi_measurements=False,
+    )
+    with pytest.raises(ValueError):
+        test.set_rbw(1000, SpectrumAnalyser.FilterType.EMI)
 
 
 def test_vbw(sa: SpectrumAnalyser):
-    # Kinda tricky to define as it's normally a discrete list
-    # Most Spectrum Analysers will support VBW = 1MHz
-    # Most Spectrum Analyser will not support VBW = 277kHz (random number)
-    sa.set_vbw(1e6)
+    sa.set_vbw(sa.supported_vbw[0])
     with pytest.raises(ValueError):
-        sa.set_vbw(277e3)
+        assert sa.supported_vbw and len(sa.supported_vbw) >= 2
+        sa.set_vbw(int(0.5 * (sa.supported_vbw[0] + sa.supported_vbw[1])))
 
 
 def test_num_sweep_points(sa: SpectrumAnalyser):
@@ -103,6 +209,8 @@ def test_trace_data(sa: SpectrumAnalyser):
     # Not really testing anything here, just that the function is implemented
     sa.trigger_sweep()
     sa.get_trace_data()
+    with pytest.raises(ValueError):
+        sa.set_trace_mode(sa.max_num_traces + 1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
 
 
 def test_marker_power(sa: SpectrumAnalyser):
