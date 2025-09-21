@@ -34,8 +34,10 @@ def test_parameter_validation(spectrum_analyser):
             max_freq=int(1e9),
             min_num_sweep_points=10,
             max_num_sweep_points=10,
-            min_span=10,
-            max_span=10,
+            min_sweep_time_s=None,  # type:ignore
+            max_sweep_time_s=None,  # type:ignore
+            min_span_hz=10,
+            max_span_hz=10,
             min_attenuation_db=None,  # type: ignore
             max_attenuation_db=None,  # type: ignore
             has_preamp=None,  # type: ignore
@@ -58,8 +60,10 @@ def test_parameter_validation(spectrum_analyser):
             max_freq=int(2e9),
             min_num_sweep_points=11,
             max_num_sweep_points=10,
-            min_span=10,
-            max_span=10,
+            min_sweep_time_s=None,  # type:ignore
+            max_sweep_time_s=None,  # type:ignore
+            min_span_hz=10,
+            max_span_hz=10,
             min_attenuation_db=None,  # type: ignore
             max_attenuation_db=None,  # type: ignore
             has_preamp=None,  # type: ignore
@@ -70,7 +74,7 @@ def test_parameter_validation(spectrum_analyser):
             supports_emi_measurements=None,  # type: ignore
         )
 
-    # Check max_span < min_span validation
+    # Check max_span_hz < min_span_hz validation
     with pytest.raises(ValueError):
         _ = SpectrumAnalyser(
             resource_manager=None,  # type: ignore
@@ -83,8 +87,10 @@ def test_parameter_validation(spectrum_analyser):
             max_freq=int(2e9),
             min_num_sweep_points=10,
             max_num_sweep_points=10,
-            min_span=11,
-            max_span=10,
+            min_sweep_time_s=None,  # type:ignore
+            max_sweep_time_s=None,  # type:ignore
+            min_span_hz=11,
+            max_span_hz=10,
             min_attenuation_db=None,  # type: ignore
             max_attenuation_db=None,  # type: ignore
             has_preamp=None,  # type: ignore
@@ -112,28 +118,28 @@ def test_max_freq(sa: SpectrumAnalyser):
 
 
 def test_centre_freq(sa: SpectrumAnalyser):
-    sa.set_centre_freq(sa.min_freq + math.ceil(0.5 * sa.min_span))
-    sa.set_centre_freq(sa.max_freq - math.ceil(0.5 * sa.min_span))
+    sa.set_centre_freq(sa.min_freq + math.ceil(0.5 * sa.min_span_hz))
+    sa.set_centre_freq(sa.max_freq - math.ceil(0.5 * sa.min_span_hz))
     with pytest.raises(ValueError):
         sa.set_centre_freq(sa.max_freq + 1)
     with pytest.raises(AssertionError):
-        sa.set_centre_freq(sa.min_freq + math.ceil(0.5 * sa.min_span) - 1)
+        sa.set_centre_freq(sa.min_freq + math.ceil(0.5 * sa.min_span_hz) - 1)
     with pytest.raises(AssertionError):
-        sa.set_centre_freq(sa.max_freq + 1 - math.ceil(0.5 * sa.min_span))
+        sa.set_centre_freq(sa.max_freq + 1 - math.ceil(0.5 * sa.min_span_hz))
 
 
 def test_span(sa: SpectrumAnalyser):
-    sa.set_span(sa.min_span)
-    sa.set_span(sa.max_span)
+    sa.set_span(sa.min_span_hz)
+    sa.set_span(sa.max_span_hz)
     with pytest.raises(ValueError):
-        sa.set_span(sa.min_span - 1)
+        sa.set_span(sa.min_span_hz - 1)
     with pytest.raises(ValueError):
-        sa.set_span(sa.max_span + 1)
+        sa.set_span(sa.max_span_hz + 1)
     with pytest.raises(ValueError):
         sa.set_span(0)
     sa.enable_zero_span()
     sa.disable_zero_span()
-    sa.set_span(sa.max_span)
+    sa.set_span(sa.max_span_hz)
 
 
 def test_rbw(sa: SpectrumAnalyser):
@@ -160,8 +166,10 @@ def test_rbw(sa: SpectrumAnalyser):
         max_freq=int(2e9),
         min_num_sweep_points=10,
         max_num_sweep_points=10,
-        min_span=10,
-        max_span=10,
+        min_sweep_time_s=None,  # type:ignore
+        max_sweep_time_s=None,  # type:ignore
+        min_span_hz=10,
+        max_span_hz=10,
         min_attenuation_db=None,  # type: ignore
         max_attenuation_db=None,  # type: ignore
         has_preamp=None,  # type: ignore
@@ -257,7 +265,11 @@ def test_multipart_sweep(sa: SpectrumAnalyser):
             ]:
                 max_freq = sa.min_freq + 1e6 * (num_points - 1)
                 results = sa.perform_multi_part_sweep(
-                    sa.min_freq, max_freq, 1e6, ensure_stop_freq_is_covered
+                    sa.min_freq,
+                    max_freq,
+                    1e6,
+                    ensure_stop_freq_is_covered,
+                    seconds_per_mhz=1e-3,
                 )
                 if ensure_stop_freq_is_covered:
                     assert results.freqs[-1] >= max_freq
@@ -285,8 +297,10 @@ def test_preamp(sa: SpectrumAnalyser):
         max_freq=int(2e9),
         min_num_sweep_points=10,
         max_num_sweep_points=10,
-        min_span=10,
-        max_span=10,
+        min_sweep_time_s=None,  # type:ignore
+        max_sweep_time_s=None,  # type:ignore
+        min_span_hz=10,
+        max_span_hz=10,
         min_attenuation_db=None,  # type: ignore
         max_attenuation_db=None,  # type: ignore
         has_preamp=False,
@@ -300,3 +314,17 @@ def test_preamp(sa: SpectrumAnalyser):
         test.set_preamp_enabled_state(False)
     with pytest.raises(RuntimeError):
         test.get_preamp_enabled_state()
+
+
+def test_sweep_time(sa: SpectrumAnalyser):
+    # Test reasonable value
+    sa.set_sweep_time(1)
+    # Test < sa.min_sweep_time
+    with pytest.raises(ValueError):
+        sa.set_sweep_time(0)
+    # Test a value x, sa.min_sweep_time < x < auto_sweep_time
+    sa.enable_auto_sweep_time()
+    auto_sweep_time = sa.get_sweep_time()
+    assert auto_sweep_time != sa.min_sweep_time_s
+    with pytest.raises(ValueError):
+        sa.set_sweep_time(0.5 * (sa.min_sweep_time_s + auto_sweep_time))

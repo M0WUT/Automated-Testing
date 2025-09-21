@@ -236,10 +236,8 @@ class BaseInstrument:
         """
         self.lock.acquire()
         try:
-            response = self.dev.query(command).strip()  # type: ignore
-            self.logger.debug(
-                f"[{self.instrument_name}] QUERY: {command}\tResponse: {response}"
-            )
+            self._write(command, acquire_lock=False)
+            response = self._read(acquire_lock=False)
         finally:
             self.lock.release()
         return response

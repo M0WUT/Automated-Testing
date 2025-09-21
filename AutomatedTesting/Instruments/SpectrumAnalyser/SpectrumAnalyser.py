@@ -67,8 +67,10 @@ class SpectrumAnalyser(EntireInstrument):
         max_freq: int,
         min_num_sweep_points: int,
         max_num_sweep_points: int,
-        min_span: int,  # Note this is ignoring zero span
-        max_span: int,
+        min_sweep_time_s: float,
+        max_sweep_time_s: float,
+        min_span_hz: int,  # Note this is ignoring zero span
+        max_span_hz: int,
         min_attenuation_db: float,
         max_attenuation_db: float,
         has_preamp: bool,
@@ -96,15 +98,17 @@ class SpectrumAnalyser(EntireInstrument):
         if (
             (max_freq < min_freq)
             or (max_num_sweep_points < min_num_sweep_points)
-            or (max_span < min_span)
+            or (max_span_hz < min_span_hz)
         ):
             raise ValueError
         self.min_freq = min_freq
         self.max_freq = max_freq
         self.min_num_sweep_points = min_num_sweep_points
         self.max_num_sweep_points = max_num_sweep_points
-        self.min_span = min_span
-        self.max_span = max_span
+        self.min_span_hz = min_span_hz
+        self.max_span_hz = max_span_hz
+        self.min_sweep_time_s = min_sweep_time_s
+        self.max_sweep_time_s = max_sweep_time_s
         self.min_attenuation_db = min_attenuation_db
         self.max_attenuation_db = max_attenuation_db
         self.has_preamp = has_preamp
@@ -243,6 +247,18 @@ class SpectrumAnalyser(EntireInstrument):
     def _get_preamp_enabled_state(self) -> bool:
         raise NotImplementedError  # pragma: no cover
 
+    def _set_sweep_time(self, sweep_time_s: float) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_sweep_time(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_sweep_time_auto_enabled_state(self, enabled: bool) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_sweep_time_auto_enabled_state(self) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
     ################################################################
     # Wrappers for functions that are for all devices
     # Any input validation should happen here so it is used across
@@ -261,7 +277,9 @@ class SpectrumAnalyser(EntireInstrument):
         if self.has_preamp:
             self.disable_preamp()
         self.set_input_attenuation(20)
+        self.enable_auto_sweep_time()
         self.set_sweep_mode(self.SweepMode.CONTINUOUS)
+
         super().__exit__(*args, **kwargs)
 
     def set_start_freq(self, freq: float):
@@ -381,10 +399,10 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Raises:
-            ValueError: If <span> is outside min_span -> max_span
+            ValueError: If <span> is outside min_span_hz -> max_span_hz
             AssertionError: If readback value doesn't match requested
         """
-        if not (self.min_span <= span_hz <= self.max_span):
+        if not (self.min_span_hz <= span_hz <= self.max_span_hz):
             raise ValueError
         self._set_span(span_hz)
         if self.verify:
@@ -673,7 +691,9 @@ class SpectrumAnalyser(EntireInstrument):
         """
         return self._get_ref_level()
 
-    def trigger_sweep(self, timeout_s: Optional[float] = None) -> None:
+    def trigger_sweep(
+        self, num_sweeps: int = 1, timeout_s: Optional[float] = None
+    ) -> None:
         """
         Triggers a sweep and blocks until completion
 
@@ -686,8 +706,9 @@ class SpectrumAnalyser(EntireInstrument):
         Raises:
             None
         """
-        self._trigger_sweep()
-        self.wait_until_op_complete(timeout_s)
+        for _ in range(num_sweeps):
+            self._trigger_sweep()
+            self.wait_until_op_complete(timeout_s)
 
     def get_trace_data(self, trace_num: int = 1) -> list[float]:
         """
@@ -977,6 +998,8 @@ class SpectrumAnalyser(EntireInstrument):
         step_size: float,
         ensure_stop_freq_is_covered: bool = True,
         detector_types: Optional[list[DetectorType]] = None,
+        seconds_per_mhz: Optional[float] = None,
+        num_sweeps: int = 1,
     ) -> SpectrumAnalyserMeasurements:
         """
         Some sweeps may require > 1 sweep to capture at sufficient resolution
@@ -1038,7 +1061,11 @@ class SpectrumAnalyser(EntireInstrument):
                     ]
                 )
                 self.set_num_sweep_points(num_points_to_measure)
-                self.trigger_sweep()
+                if seconds_per_mhz:
+                    self.set_sweep_time(
+                        num_points_to_measure * step_size * seconds_per_mhz / 1e6
+                    )
+                self.trigger_sweep(num_sweeps)
 
                 # Add datapoints to results
                 results.freqs += self.get_trace_freqs()
@@ -1058,7 +1085,11 @@ class SpectrumAnalyser(EntireInstrument):
                 )
                 self.set_stop_freq(freqs_to_measure[stop_freq_index])
                 self.set_num_sweep_points(num_points_to_measure)
-                self.trigger_sweep()
+                if seconds_per_mhz:
+                    self.set_sweep_time(
+                        num_points_to_measure * step_size * seconds_per_mhz / 1e6
+                    )
+                self.trigger_sweep(num_sweeps)
                 # Add valid datapoints to results - there will be unnecessary points
                 # at the start
                 response_freqs = self.get_trace_freqs()
@@ -1161,3 +1192,100 @@ class SpectrumAnalyser(EntireInstrument):
 
     def disable_preamp(self):
         self.set_preamp_enabled_state(False)
+
+    def set_sweep_time(self, sweep_time_s: float) -> None:
+        """
+        Sets sweep time
+
+        Args:
+            sweep_time_s (float): sweep time in seconds
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: if sweep_time_s is outside_supported_range
+            AssertionError: if readback value is incorrect
+        """
+
+        # Auto sweep time will almost certainly be fastest so also need to ensure
+        # requested time exceeds that
+        self.enable_auto_sweep_time()
+        auto_sweep_time = self.get_sweep_time()
+
+        if not self.min_sweep_time_s <= sweep_time_s <= self.max_sweep_time_s:
+            raise ValueError
+
+        if not sweep_time_s >= auto_sweep_time:
+            raise ValueError(
+                f"Requested sweep time of {sweep_time_s}s is less "
+                f"than auto time of {auto_sweep_time}s"
+            )
+
+        self._set_sweep_time(sweep_time_s)
+        if self.verify:
+            assert self.get_sweep_time() == sweep_time_s
+
+    def get_sweep_time(self) -> float:
+        """
+        Returns sweep time
+
+        Args:
+            None
+
+        Returns:
+            float: sweep time in seconds
+
+        Raises:
+            None
+        """
+        return self._get_sweep_time()
+
+    def set_sweep_time_auto_enabled_state(self, enabled: bool) -> None:
+        """
+        Sets whether auto sweep time is used or not
+
+        Args:
+            enabled (bool): True to enable auto-sweep time
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: if readback value is incorrect
+        """
+        self._set_sweep_time_auto_enabled_state(enabled)
+        if self.verify:
+            assert self.get_sweep_time_auto_enabled_state() == enabled
+
+    def get_sweep_time_auto_enabled_state(self) -> bool:
+        """
+        Returns whether auto sweep time is used or not
+
+        Args:
+            None
+
+        Returns:
+            bool: True if auto-sweep time is enabled
+
+        Raises:
+            None
+        """
+        return self._get_sweep_time_auto_enabled_state()
+
+    def enable_auto_sweep_time(self):
+        """
+        Sets sweep time to auto
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        # Don't have disable function - that will happen when
+        # sweep time is set manually
+        self.set_sweep_time_auto_enabled_state(True)

@@ -33,8 +33,10 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             max_freq=int(3.2e9),
             min_num_sweep_points=751,
             max_num_sweep_points=751,
-            min_span=100,
-            max_span=int(3.2e9),
+            min_sweep_time_s=450e-6,
+            max_sweep_time_s=1500,
+            min_span_hz=100,
+            max_span_hz=int(3.2e9),
             min_attenuation_db=0,
             max_attenuation_db=51,
             has_preamp=True,
@@ -111,6 +113,14 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
     def set_local_control(self):
         self._write("SYST:LOC")
 
+    def initialise(self):
+        super().initialise()
+        self._write(":SWE:MODE SWE")
+
+    #########################################
+    # Functions from SpectrumAnalyser class #
+    #########################################
+
     def _set_start_freq(self, freq_hz: float):
         self._write(f":FREQ:STAR {freq_hz}")
 
@@ -139,17 +149,18 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         if enabled:
             self._write(":FREQ:SPAN:ZERO")
         else:
-            self.set_span(self.min_span)
+            self.set_span(self.min_span_hz)
 
     def _get_zero_span_enabled_state(self) -> bool:
         return self.get_span() == 0
 
     def _set_filter_type(self, filter_type: SpectrumAnalyser.FilterType) -> None:
         # Changing the filter type auto-adjusts the units for the y-axis
-        # Don't want things happening magically
+        # and sweep type. Don't want things happening magically
         old_units = self.get_y_axis_units()
         self._write(f":FILT:TYPE {self._filter_str[filter_type]}")
         self.set_y_axis_units(old_units)
+        self._write(":SWE:MODE SWE")
 
     def _get_filter_type(self) -> SpectrumAnalyser.FilterType:
         response = self._query(":FILT:TYPE?")
@@ -248,3 +259,15 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
 
     def _get_preamp_enabled_state(self) -> bool:
         return self._query(":POW:GAIN?") == "1"
+
+    def _set_sweep_time(self, sweep_time_s: float) -> None:
+        self._write(f":SWE:TIME {sweep_time_s}")
+
+    def _get_sweep_time(self) -> float:
+        return float(self._query(":SWE:TIME?"))
+
+    def _set_sweep_time_auto_enabled_state(self, enabled: bool) -> None:
+        self._write(f":SWE:TIME:AUTO {'ON' if enabled else 'OFF'}")
+
+    def _get_sweep_time_auto_enabled_state(self) -> bool:
+        return self._query(":SWE:TIME:AUTO?") == "1"
