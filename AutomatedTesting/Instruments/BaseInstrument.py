@@ -60,6 +60,7 @@ class BaseInstrument:
 
     def __enter__(self):
         self.initialise()
+        return self
 
     def initialise(self):
         """

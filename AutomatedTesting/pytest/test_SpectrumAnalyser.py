@@ -253,31 +253,35 @@ def test_instrument_errors(sa: SpectrumAnalyser):
 
 def test_multipart_sweep(sa: SpectrumAnalyser):
     sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
-    if sa.max_freq >= sa.min_freq + 2 * (sa.max_num_sweep_points + 1) * 1e6:
-        for ensure_stop_freq_is_covered in [True, False]:
-            for num_points in [
-                sa.min_num_sweep_points,
-                sa.max_num_sweep_points,
-                sa.max_num_sweep_points + 1,
-                2 * sa.max_num_sweep_points - 1,
-                2 * sa.max_num_sweep_points,
-                2 * sa.max_num_sweep_points + 1,
-            ]:
-                max_freq = sa.min_freq + 1e6 * (num_points - 1)
-                results = sa.perform_multi_part_sweep(
-                    sa.min_freq,
-                    max_freq,
-                    1e6,
-                    ensure_stop_freq_is_covered,
-                    seconds_per_mhz=1e-3,
-                )
-                if ensure_stop_freq_is_covered:
-                    assert results.freqs[-1] >= max_freq
-                else:
-                    assert results.freqs[-1] <= max_freq
-
-    else:
+    if sa.max_freq <= sa.min_freq + 2 * (sa.max_num_sweep_points + 1) * 1e6:
         raise NotImplementedError
+
+    for ensure_stop_freq_is_covered in [True, False]:
+        for num_points in [
+            sa.min_num_sweep_points,
+            sa.max_num_sweep_points,
+            sa.max_num_sweep_points + 1,
+            2 * sa.max_num_sweep_points - 1,
+            2 * sa.max_num_sweep_points,
+            2 * sa.max_num_sweep_points + 1,
+        ]:
+            max_freq = sa.min_freq + 1e6 * (num_points - 1)
+            results = sa.perform_multi_part_sweep(
+                sa.min_freq,
+                max_freq,
+                1e6,
+                ensure_stop_freq_is_covered,
+                seconds_per_mhz=1e-3,
+            )
+            if ensure_stop_freq_is_covered:
+                assert results.freqs[-1] >= max_freq
+            else:
+                assert results.freqs[-1] <= max_freq
+        # Check correct behaviour when seconds_per_mhz is not defined
+        # Use convenient values left over from last iteration of main test
+        sa.perform_multi_part_sweep(
+            sa.min_freq, max_freq, 1e6, ensure_stop_freq_is_covered
+        )
 
 
 def test_preamp(sa: SpectrumAnalyser):
@@ -328,3 +332,63 @@ def test_sweep_time(sa: SpectrumAnalyser):
     assert auto_sweep_time != sa.min_sweep_time_s
     with pytest.raises(ValueError):
         sa.set_sweep_time(0.5 * (sa.min_sweep_time_s + auto_sweep_time))
+
+
+def test_spectrum_analyser_measurement_combination(spectrum_analyser):
+    x = SpectrumAnalyser.SpectrumAnalyserMeasurements(
+        freqs=[1, 2, 3, 4],
+        datapoints={
+            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
+            SpectrumAnalyser.DetectorType.AVERAGE: [9, 10, 11, 12],
+        },
+    )
+
+    y = SpectrumAnalyser.SpectrumAnalyserMeasurements(
+        freqs=[5, 6, 7, 8],
+        datapoints={
+            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [13, 14, 15, 16],
+            SpectrumAnalyser.DetectorType.AVERAGE: [17, 18, 19, 20],
+        },
+    )
+
+    z = x + y
+    assert z.freqs == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert z.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK] == [
+        5,
+        6,
+        7,
+        8,
+        13,
+        14,
+        15,
+        16,
+    ]
+    assert z.datapoints[SpectrumAnalyser.DetectorType.AVERAGE] == [
+        9,
+        10,
+        11,
+        12,
+        17,
+        18,
+        19,
+        20,
+    ]
+
+    # Check different detector types raises Error
+    with pytest.raises(ValueError):
+        _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurements(
+            freqs=[5, 6, 7, 8],
+            datapoints={
+                SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
+            },
+        )
+
+    # Check overlapping frequencies raises Error
+    with pytest.raises(RuntimeError):
+        _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurements(
+            freqs=[4, 5, 6, 7],
+            datapoints={
+                SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
+                SpectrumAnalyser.DetectorType.AVERAGE: [17, 18, 19, 20],
+            },
+        )

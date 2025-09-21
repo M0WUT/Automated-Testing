@@ -10,6 +10,7 @@ from pyvisa import ResourceManager
 
 # Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
+from AutomatedTesting.Misc.UsefulFunctions import prefixify
 
 
 class SpectrumAnalyser(EntireInstrument):
@@ -54,6 +55,44 @@ class SpectrumAnalyser(EntireInstrument):
             self.datapoints: dict["SpectrumAnalyser.DetectorType", list[float]] = (
                 datapoints if datapoints else {}
             )
+
+        def __add__(self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurements"):
+            """
+            Allows combination of the results of multiple sweeps
+            e.g. EMC emissions measured with different settings
+            """
+            if not self.datapoints.keys() == other.datapoints.keys():
+                raise ValueError(
+                    "Cannot combine measurements with different detector types"
+                )
+
+            # Sanity check inputs as this will go horribly wrong if not
+            assert all([len(x) == len(self.freqs) for x in self.datapoints.values()])
+            assert all([len(x) == len(other.freqs) for x in other.datapoints.values()])
+            for x in self.freqs:
+                if x in other.freqs:
+                    raise RuntimeError(
+                        f"Frequency {prefixify(x, 'Hz')} found in both measurements"
+                    )
+
+            result = SpectrumAnalyser.SpectrumAnalyserMeasurements()
+            result.freqs = self.freqs + other.freqs
+            result.freqs.sort()
+            result.datapoints = {}
+
+            for detector_type in self.datapoints.keys():
+                # Combine measurements to (freq, value) tuples
+                self_tuples = [
+                    x for x in zip(self.freqs, self.datapoints[detector_type])
+                ]
+                other_tuples = [
+                    x for x in zip(other.freqs, other.datapoints[detector_type])
+                ]
+                combined_tuples = self_tuples + other_tuples
+                combined_tuples.sort(key=lambda x: x[0])
+                result.datapoints[detector_type] = [x[1] for x in combined_tuples]
+
+            return result
 
     def __init__(
         self,
@@ -272,6 +311,7 @@ class SpectrumAnalyser(EntireInstrument):
             self.disable_trace(x)
         for x in range(1, self.max_num_markers + 1):
             self.set_marker_enabled_state(x, False)
+        return self
 
     def __exit__(self, *args, **kwargs):
         if self.has_preamp:
@@ -1065,6 +1105,8 @@ class SpectrumAnalyser(EntireInstrument):
                     self.set_sweep_time(
                         num_points_to_measure * step_size * seconds_per_mhz / 1e6
                     )
+                else:
+                    self.enable_auto_sweep_time()
                 self.trigger_sweep(num_sweeps)
 
                 # Add datapoints to results
@@ -1089,6 +1131,8 @@ class SpectrumAnalyser(EntireInstrument):
                     self.set_sweep_time(
                         num_points_to_measure * step_size * seconds_per_mhz / 1e6
                     )
+                else:
+                    self.enable_auto_sweep_time()
                 self.trigger_sweep(num_sweeps)
                 # Add valid datapoints to results - there will be unnecessary points
                 # at the start
