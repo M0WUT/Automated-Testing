@@ -260,9 +260,43 @@ def test_multipart_sweep(sa: SpectrumAnalyser):
                     sa.min_freq, max_freq, 1e6, ensure_stop_freq_is_covered
                 )
                 if ensure_stop_freq_is_covered:
-                    assert results[-1][0] >= max_freq
+                    assert results.freqs[-1] >= max_freq
                 else:
-                    assert results[-1][0] <= max_freq
+                    assert results.freqs[-1] <= max_freq
 
     else:
         raise NotImplementedError
+
+
+def test_preamp(sa: SpectrumAnalyser):
+    if sa.has_preamp:
+        sa.enable_preamp()
+        sa.disable_preamp()
+
+    # Test to test preamp on a spectrum analyser that doesn't support it
+    test = SpectrumAnalyser(
+        resource_manager=None,  # type: ignore
+        visa_address=None,  # type: ignore
+        name=None,  # type: ignore
+        expected_idn_response=None,  # type: ignore
+        verify=None,  # type: ignore
+        logger=None,  # type: ignore
+        min_freq=int(1e9),
+        max_freq=int(2e9),
+        min_num_sweep_points=10,
+        max_num_sweep_points=10,
+        min_span=10,
+        max_span=10,
+        min_attenuation_db=None,  # type: ignore
+        max_attenuation_db=None,  # type: ignore
+        has_preamp=False,
+        supported_rbw=[1000],
+        supported_vbw=None,  # type: ignore
+        max_num_traces=None,  # type: ignore
+        max_num_markers=None,  # type: ignore
+        supports_emi_measurements=False,
+    )
+    with pytest.raises(RuntimeError):
+        test.set_preamp_enabled_state(False)
+    with pytest.raises(RuntimeError):
+        test.get_preamp_enabled_state()

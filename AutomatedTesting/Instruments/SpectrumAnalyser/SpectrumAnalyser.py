@@ -35,6 +35,26 @@ class SpectrumAnalyser(EntireInstrument):
         BLANK = auto()
         AVERAGE = auto()
 
+    class YAxisUnits(Enum):
+        DBM = auto()
+        DBMV = auto()
+        DBUV = auto()
+        VOLTS = auto()
+        WATTS = auto()
+
+    class SpectrumAnalyserMeasurements:
+        def __init__(
+            self,
+            freqs: Optional[list[float]] = None,
+            datapoints: Optional[
+                dict["SpectrumAnalyser.DetectorType", list[float]]
+            ] = None,
+        ):
+            self.freqs: list[float] = freqs if freqs else []
+            self.datapoints: dict["SpectrumAnalyser.DetectorType", list[float]] = (
+                datapoints if datapoints else {}
+            )
+
     def __init__(
         self,
         resource_manager: ResourceManager,
@@ -205,6 +225,24 @@ class SpectrumAnalyser(EntireInstrument):
     def _get_trace_mode(self, trace_num: int) -> TraceMode:
         raise NotImplementedError  # pragma: no cover
 
+    def _set_detector_type(self, trace_num: int, detector_type: DetectorType) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_detector_type(self, trace_num: int) -> DetectorType:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_y_axis_units(self, units: YAxisUnits) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_y_axis_units(self) -> YAxisUnits:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_preamp_enabled_state(self, enabled: bool):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_preamp_enabled_state(self) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
     ################################################################
     # Wrappers for functions that are for all devices
     # Any input validation should happen here so it is used across
@@ -220,6 +258,9 @@ class SpectrumAnalyser(EntireInstrument):
             self.set_marker_enabled_state(x, False)
 
     def __exit__(self, *args, **kwargs):
+        if self.has_preamp:
+            self.disable_preamp()
+        self.set_input_attenuation(20)
         self.set_sweep_mode(self.SweepMode.CONTINUOUS)
         super().__exit__(*args, **kwargs)
 
@@ -241,7 +282,8 @@ class SpectrumAnalyser(EntireInstrument):
             raise ValueError
         self._set_start_freq(freq)
         if self.verify:
-            assert self.get_start_freq() == freq
+            response = self.get_start_freq()
+            assert response == freq
 
     def get_start_freq(self) -> float:
         """
@@ -663,6 +705,16 @@ class SpectrumAnalyser(EntireInstrument):
         self.validate_trace_num(trace_num)
         return self._get_trace_data()
 
+    def get_trace_freqs(self) -> list[float]:
+        """
+        Returns a list of the swept frequency points
+        N.B. This assumes that the spacing is linear
+        """
+        freqs = linspace(
+            self.get_start_freq(), self.get_stop_freq(), self.get_num_sweep_points()
+        )
+        return [float(x) for x in freqs]
+
     def get_trace_data_with_freqs(
         self, trace_num: int = 1
     ) -> list[tuple[float, float]]:
@@ -682,10 +734,7 @@ class SpectrumAnalyser(EntireInstrument):
         if self.get_zero_span_enabled_state():
             raise RuntimeError("Cannot get frequency data in zero span mode")
 
-        freqs = linspace(
-            self.get_start_freq(), self.get_stop_freq(), self.get_num_sweep_points()
-        )
-        return list(zip([float(x) for x in freqs], self.get_trace_data(trace_num)))
+        return list(zip(self.get_trace_freqs(), self.get_trace_data(trace_num)))
 
     def validate_marker_num(self, marker_num: int) -> None:
         """
@@ -848,7 +897,7 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Raises:
-            None
+            AssertionError: if readback is not correct
         """
         self.validate_trace_num(trace_num)
         self._set_trace_mode(trace_num, mode)
@@ -886,13 +935,49 @@ class SpectrumAnalyser(EntireInstrument):
         """
         self.set_trace_mode(trace_num, SpectrumAnalyser.TraceMode.BLANK)
 
+    def set_detector_type(self, trace_num: int, detector_type: DetectorType) -> None:
+        """
+        Sets the detector type used for a certain trace
+
+        Args:
+            trace_num (int): which trace to set the detector of
+            detector_type (DetectorType): which detector type to use
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.validate_trace_num(trace_num)
+        self._set_detector_type(trace_num, detector_type)
+        if self.verify:
+            assert self.get_detector_type(trace_num) == detector_type
+
+    def get_detector_type(self, trace_num: int) -> DetectorType:
+        """
+        Returns the detector type used for a certain trace
+
+        Args:
+            trace_num (int): which trace to get the detector of
+
+        Returns:
+            DetectorType: which detector is in use
+
+        Raises:
+            None
+        """
+        self.validate_trace_num(trace_num)
+        return self._get_detector_type(trace_num)
+
     def perform_multi_part_sweep(
         self,
         start_freq: float,
         stop_freq: float,
         step_size: float,
         ensure_stop_freq_is_covered: bool = True,
-    ) -> list[tuple[float, float]]:
+        detector_types: Optional[list[DetectorType]] = None,
+    ) -> SpectrumAnalyserMeasurements:
         """
         Some sweeps may require > 1 sweep to capture at sufficient resolution
         e.g. for EMC measurements where there might be a small RBW,
@@ -912,7 +997,15 @@ class SpectrumAnalyser(EntireInstrument):
                 <start-freq> + N * <step-size> <= stop_freq
 
         """
-        results: list[tuple[float, float]] = []
+        results = SpectrumAnalyser.SpectrumAnalyserMeasurements()
+
+        if detector_types is None:
+            detector_types = [SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
+
+        for trace_num, detector_type in enumerate(detector_types):
+            self.set_detector_type(trace_num + 1, detector_type)
+            self.set_trace_mode(trace_num + 1, SpectrumAnalyser.TraceMode.MAX_HOLD)
+            results.datapoints[detector_type] = []
 
         # Plus 1 for fencepost problem
         num_points_required = 1 + (stop_freq - start_freq) / step_size
@@ -920,10 +1013,6 @@ class SpectrumAnalyser(EntireInstrument):
             num_points_required = ceil(num_points_required)
         else:
             num_points_required = floor(num_points_required)
-
-        self.logger.debug(
-            f"Start Freq: {start_freq}, Stop Freq: {stop_freq}, Num Points: {num_points_required}"
-        )
 
         # Can't handle if the request is smaller than min sweep points.
         # What extra frequencies do you than pad, on what side of the requested range?
@@ -950,7 +1039,15 @@ class SpectrumAnalyser(EntireInstrument):
                 )
                 self.set_num_sweep_points(num_points_to_measure)
                 self.trigger_sweep()
-                results += self.get_trace_data_with_freqs()
+
+                # Add datapoints to results
+                results.freqs += self.get_trace_freqs()
+                for trace_index, detector_type in enumerate(detector_types):
+                    results.datapoints[detector_type] += self.get_trace_data(
+                        trace_index + 1
+                    )
+
+                # Update counters
                 current_start_freq_index += num_points_to_measure
                 num_remaining_points -= num_points_to_measure
             else:
@@ -962,29 +1059,105 @@ class SpectrumAnalyser(EntireInstrument):
                 self.set_stop_freq(freqs_to_measure[stop_freq_index])
                 self.set_num_sweep_points(num_points_to_measure)
                 self.trigger_sweep()
-                response = self.get_trace_data_with_freqs()
-                valid_response = [
+                # Add valid datapoints to results - there will be unnecessary points
+                # at the start
+                response_freqs = self.get_trace_freqs()
+                results.freqs += [
                     x
-                    for x in response
-                    if x[0] >= freqs_to_measure[current_start_freq_index]
+                    for x in response_freqs
+                    if x >= freqs_to_measure[current_start_freq_index]
                 ]
-                results += valid_response
+
+                for trace_index, detector_type in enumerate(detector_types):
+                    results.datapoints[detector_type] += [
+                        x[1]
+                        for x in self.get_trace_data_with_freqs(trace_index + 1)
+                        if x[0] >= freqs_to_measure[current_start_freq_index]
+                    ]
+
                 current_start_freq_index = stop_freq_index
                 num_remaining_points = 0
 
-        results.sort(key=lambda x: x[0])
-        actually_measured_freqs = [x[0] for x in results]
-
         # Sanity check all the things
-        assert freqs_to_measure == actually_measured_freqs
-        # for index, (requested_freq, measured_freq) in enumerate(
-        #     zip(freqs_to_measure, actually_measured_freqs)
-        # ):
-        #     if requested_freq != measured_freq:
-
-        #         raise RuntimeError(
-        #             f"Mismatch in requested and reported freqs and index {index}."
-        #             f"Requested: {requested_freq}, Measured: {measured_freq}"
-        #         )
-
+        assert freqs_to_measure == results.freqs
         return results
+
+    def set_y_axis_units(self, units: YAxisUnits) -> None:
+        """
+        Sets the units in use for the y-axis
+
+        Args:
+            units (YAxisUnits): which units to use
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: if readback is not correct
+        """
+
+        self._set_y_axis_units(units)
+        if self.verify:
+            assert self.get_y_axis_units() == units
+
+    def get_y_axis_units(self) -> YAxisUnits:
+        """
+        Returns the units in use for the y-axis
+
+        Args:
+            None
+
+        Returns:
+            YAxisUnits: which units are in use
+
+        Raises:
+            None
+        """
+        return self._get_y_axis_units()
+
+    def set_preamp_enabled_state(self, enabled: bool):
+        """
+        Sets whether the pre-amp is enabled
+
+        Args:
+            None
+
+        Returns:
+            YAxisUnits: which units are in use
+
+        Raises:
+            RuntimeError: If spectrum analyser doesn't have a preamp
+            AssertionError: if readback is not correct
+        """
+        if self.has_preamp is False:
+            raise RuntimeError(
+                "Attempted to set pre-amp state on analyser without preamp"
+            )
+        self._set_preamp_enabled_state(enabled)
+        if self.verify:
+            assert self.get_preamp_enabled_state() == enabled
+
+    def get_preamp_enabled_state(self) -> bool:
+        """
+        Returns true if the pre-amp is enabled
+
+        Args:
+            None
+
+        Returns:
+            bool: True if pre-amp is enabled
+
+        Raises:
+            RuntimeError: If spectrum analyser doesn't have a preamp
+        """
+        if self.has_preamp is False:
+            raise RuntimeError(
+                "Attempted to set pre-amp state on analyser without preamp"
+            )
+        return self._get_preamp_enabled_state()
+
+    def enable_preamp(self):
+        self.set_preamp_enabled_state(True)
+
+    def disable_preamp(self):
+        self.set_preamp_enabled_state(False)

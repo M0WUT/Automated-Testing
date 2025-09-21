@@ -2,7 +2,6 @@
 from logging import Logger
 
 # Third party imports
-from numpy import linspace
 from pyvisa import ResourceManager
 
 # Local imports
@@ -91,6 +90,21 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             SpectrumAnalyser.FilterType.EMI: "EMI",
         }
 
+        self._detector_str = {
+            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: "POS",
+            SpectrumAnalyser.DetectorType.NEGATIVE_PEAK: "NEG",
+            SpectrumAnalyser.DetectorType.AVERAGE: "AVER",
+            SpectrumAnalyser.DetectorType.QUASI_PEAK: "QUAS",
+        }
+
+        self._y_axis_unit_str = {
+            SpectrumAnalyser.YAxisUnits.DBM: "DBM",
+            SpectrumAnalyser.YAxisUnits.DBMV: "DBMV",
+            SpectrumAnalyser.YAxisUnits.DBUV: "DBUV",
+            SpectrumAnalyser.YAxisUnits.VOLTS: "V",
+            SpectrumAnalyser.YAxisUnits.WATTS: "W",
+        }
+
     #####################################
     # Override BaseInstrument functions #
     #####################################
@@ -131,7 +145,11 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         return self.get_span() == 0
 
     def _set_filter_type(self, filter_type: SpectrumAnalyser.FilterType) -> None:
+        # Changing the filter type auto-adjusts the units for the y-axis
+        # Don't want things happening magically
+        old_units = self.get_y_axis_units()
         self._write(f":FILT:TYPE {self._filter_str[filter_type]}")
+        self.set_y_axis_units(old_units)
 
     def _get_filter_type(self) -> SpectrumAnalyser.FilterType:
         response = self._query(":FILT:TYPE?")
@@ -208,3 +226,25 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
     def _get_trace_mode(self, trace_num: int) -> SpectrumAnalyser.TraceMode:
         response = self._query(f":TRAC{trace_num}:MODE?")
         return get_key_from_dict_value(self._trace_str, response)
+
+    def _set_detector_type(
+        self, trace_num: int, detector_type: SpectrumAnalyser.DetectorType
+    ) -> None:
+        self._write(f":DET:TRAC{trace_num} {self._detector_str[detector_type]}")
+
+    def _get_detector_type(self, trace_num: int) -> SpectrumAnalyser.DetectorType:
+        response = self._query(f":DET:TRAC{trace_num}?")
+        return get_key_from_dict_value(self._detector_str, response)
+
+    def _set_y_axis_units(self, units: SpectrumAnalyser.YAxisUnits) -> None:
+        self._write(f":UNIT:POW {self._y_axis_unit_str[units]}")
+
+    def _get_y_axis_units(self) -> SpectrumAnalyser.YAxisUnits:
+        response = self._query(":UNIT:POW?")
+        return get_key_from_dict_value(self._y_axis_unit_str, response)
+
+    def _set_preamp_enabled_state(self, enabled: bool):
+        self._write(f":POW:GAIN {'ON' if enabled else 'OFF'}")
+
+    def _get_preamp_enabled_state(self) -> bool:
+        return self._query(":POW:GAIN?") == "1"
