@@ -211,6 +211,10 @@ def test_trace_data(sa: SpectrumAnalyser):
     sa.get_trace_data()
     with pytest.raises(ValueError):
         sa.set_trace_mode(sa.max_num_traces + 1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    sa.enable_zero_span()
+    sa.trigger_sweep()
+    with pytest.raises(RuntimeError):
+        sa.get_trace_data_with_freqs()
 
 
 def test_marker_power(sa: SpectrumAnalyser):
@@ -237,3 +241,28 @@ def test_marker_power(sa: SpectrumAnalyser):
 
 def test_instrument_errors(sa: SpectrumAnalyser):
     sa.get_instrument_errors()
+
+
+def test_multipart_sweep(sa: SpectrumAnalyser):
+    sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    if sa.max_freq >= sa.min_freq + 2 * (sa.max_num_sweep_points + 1) * 1e6:
+        for ensure_stop_freq_is_covered in [True, False]:
+            for num_points in [
+                sa.min_num_sweep_points,
+                sa.max_num_sweep_points,
+                sa.max_num_sweep_points + 1,
+                2 * sa.max_num_sweep_points - 1,
+                2 * sa.max_num_sweep_points,
+                2 * sa.max_num_sweep_points + 1,
+            ]:
+                max_freq = sa.min_freq + 1e6 * (num_points - 1)
+                results = sa.perform_multi_part_sweep(
+                    sa.min_freq, max_freq, 1e6, ensure_stop_freq_is_covered
+                )
+                if ensure_stop_freq_is_covered:
+                    assert results[-1][0] >= max_freq
+                else:
+                    assert results[-1][0] <= max_freq
+
+    else:
+        raise NotImplementedError

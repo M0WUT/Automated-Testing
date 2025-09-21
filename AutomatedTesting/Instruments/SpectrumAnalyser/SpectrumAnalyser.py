@@ -1,9 +1,14 @@
+# Standard imports
 from enum import Enum, auto
 from logging import Logger
 from typing import Optional
+from math import ceil, floor
 
+# Third party imports
+from numpy import linspace
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 
 
@@ -172,7 +177,7 @@ class SpectrumAnalyser(EntireInstrument):
     def _trigger_sweep(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def _get_trace_data(self) -> list[tuple[float, float]]:
+    def _get_trace_data(self) -> list[float]:
         raise NotImplementedError  # pragma: no cover
 
     def _set_marker_enabled_state(self, marker_num: int, enabled_bool) -> None:
@@ -642,12 +647,30 @@ class SpectrumAnalyser(EntireInstrument):
         self._trigger_sweep()
         self.wait_until_op_complete(timeout_s)
 
-    def get_trace_data(self) -> list[tuple[float, float]]:
+    def get_trace_data(self, trace_num: int = 1) -> list[float]:
         """
         Returns trace data
 
         Args:
+            trace_num (int): Number of which trace to get data from
+
+        Returns:
+            list[float]: list of (power in y-axis units)
+
+        Raises:
             None
+        """
+        self.validate_trace_num(trace_num)
+        return self._get_trace_data()
+
+    def get_trace_data_with_freqs(
+        self, trace_num: int = 1
+    ) -> list[tuple[float, float]]:
+        """
+        Returns trace data for a given trace number
+
+        Args:
+            trace_num (int): Number of which trace to get data from
 
         Returns:
             list[tuple[float, float]:
@@ -656,7 +679,13 @@ class SpectrumAnalyser(EntireInstrument):
         Raises:
             None
         """
-        return self._get_trace_data()
+        if self.get_zero_span_enabled_state():
+            raise RuntimeError("Cannot get frequency data in zero span mode")
+
+        freqs = linspace(
+            self.get_start_freq(), self.get_stop_freq(), self.get_num_sweep_points()
+        )
+        return list(zip([float(x) for x in freqs], self.get_trace_data(trace_num)))
 
     def validate_marker_num(self, marker_num: int) -> None:
         """
@@ -856,3 +885,106 @@ class SpectrumAnalyser(EntireInstrument):
             None
         """
         self.set_trace_mode(trace_num, SpectrumAnalyser.TraceMode.BLANK)
+
+    def perform_multi_part_sweep(
+        self,
+        start_freq: float,
+        stop_freq: float,
+        step_size: float,
+        ensure_stop_freq_is_covered: bool = True,
+    ) -> list[tuple[float, float]]:
+        """
+        Some sweeps may require > 1 sweep to capture at sufficient resolution
+        e.g. for EMC measurements where there might be a small RBW,
+        step size must be RBW/2 (for full capture), and a large span
+
+        This performs as many sweeps as needed at the spectrum analyser's maximum number
+        of points and concatenates the results
+
+        It will always start at <start-freq>, behaviour of the last point is
+        controlled by <ensure_stop_freq_is_covered>.
+            If True (max sure frequency range exceeds that point):
+                it will stop at the smallest value of N for which
+                <start-freq> + N * <step-size> >= stop_freq
+            If False (e.g. if stop freq is max_freq of spectrum analyser
+                    and must not be exceeded):
+                it will stop at the largest value of N for which
+                <start-freq> + N * <step-size> <= stop_freq
+
+        """
+        results: list[tuple[float, float]] = []
+
+        # Plus 1 for fencepost problem
+        num_points_required = 1 + (stop_freq - start_freq) / step_size
+        if ensure_stop_freq_is_covered:
+            num_points_required = ceil(num_points_required)
+        else:
+            num_points_required = floor(num_points_required)
+
+        self.logger.debug(
+            f"Start Freq: {start_freq}, Stop Freq: {stop_freq}, Num Points: {num_points_required}"
+        )
+
+        # Can't handle if the request is smaller than min sweep points.
+        # What extra frequencies do you than pad, on what side of the requested range?
+        assert num_points_required >= self.min_num_sweep_points
+
+        freqs_to_measure = [
+            start_freq + x * step_size for x in range(num_points_required)
+        ]
+
+        current_start_freq_index = 0
+        stop_freq_index = num_points_required - 1
+        num_remaining_points = num_points_required
+
+        while num_remaining_points:
+            if num_remaining_points >= self.min_num_sweep_points:
+                num_points_to_measure = min(
+                    num_remaining_points, self.max_num_sweep_points
+                )
+                self.set_start_freq(freqs_to_measure[current_start_freq_index])
+                self.set_stop_freq(
+                    freqs_to_measure[
+                        current_start_freq_index + num_points_to_measure - 1
+                    ]
+                )
+                self.set_num_sweep_points(num_points_to_measure)
+                self.trigger_sweep()
+                results += self.get_trace_data_with_freqs()
+                current_start_freq_index += num_points_to_measure
+                num_remaining_points -= num_points_to_measure
+            else:
+                # We need fewer points than can be handled in a single sweep :(
+                num_points_to_measure = self.min_num_sweep_points
+                self.set_start_freq(
+                    freqs_to_measure[stop_freq_index - num_points_to_measure + 1]
+                )
+                self.set_stop_freq(freqs_to_measure[stop_freq_index])
+                self.set_num_sweep_points(num_points_to_measure)
+                self.trigger_sweep()
+                response = self.get_trace_data_with_freqs()
+                valid_response = [
+                    x
+                    for x in response
+                    if x[0] >= freqs_to_measure[current_start_freq_index]
+                ]
+                results += valid_response
+                current_start_freq_index = stop_freq_index
+                num_remaining_points = 0
+
+        results.sort(key=lambda x: x[0])
+        actually_measured_freqs = [x[0] for x in results]
+
+        # Sanity check all the things
+        assert freqs_to_measure == actually_measured_freqs
+        # for index, (requested_freq, measured_freq) in enumerate(
+        #     zip(freqs_to_measure, actually_measured_freqs)
+        # ):
+        #     if requested_freq != measured_freq:
+
+        #         raise RuntimeError(
+        #             f"Mismatch in requested and reported freqs and index {index}."
+        #             f"Requested: {requested_freq}, Measured: {measured_freq}"
+        #         )
+
+        return results
