@@ -55,7 +55,7 @@ def test_span(sa: SpectrumAnalyser):
         sa.set_span(sa.max_span + 1)
     with pytest.raises(ValueError):
         sa.set_span(0)
-    sa.set_zero_span()
+    sa.enable_zero_span()
 
 
 def test_rbw(sa: SpectrumAnalyser):
@@ -76,31 +76,22 @@ def test_vbw(sa: SpectrumAnalyser):
         sa.set_vbw(277e3)
 
 
-def test_rbw_vbw_ratio(sa: SpectrumAnalyser):
-    # Kinda tricky to define as it's normally a discrete list
-    # Most Spectrum Analysers will support VBW = RBW
-    # Most Spectrum Analyser will not support VBW = 27 * RBW
-    sa.set_vbw_rbw_ratio(1)
-    with pytest.raises(AssertionError):
-        sa.set_vbw_rbw_ratio(27)
-
-
-def test_sweep_points(sa: SpectrumAnalyser):
-    sa.set_sweep_points(sa.min_sweep_points)
+def test_num_sweep_points(sa: SpectrumAnalyser):
+    sa.set_num_sweep_points(sa.min_num_sweep_points)
     with pytest.raises(ValueError):
-        sa.set_sweep_points(sa.min_sweep_points - 1)
-    sa.set_sweep_points(sa.max_sweep_points)
+        sa.set_num_sweep_points(sa.min_num_sweep_points - 1)
+    sa.set_num_sweep_points(sa.max_num_sweep_points)
     with pytest.raises(ValueError):
-        sa.set_sweep_points(sa.max_sweep_points + 1)
+        sa.set_num_sweep_points(sa.max_num_sweep_points + 1)
 
 
 def test_input_attenuation(sa: SpectrumAnalyser):
-    sa.set_input_attenuation(sa.min_attenuation)
-    sa.set_input_attenuation(sa.max_attenuation)
+    sa.set_input_attenuation(sa.min_attenuation_db)
+    sa.set_input_attenuation(sa.max_attenuation_db)
     with pytest.raises(ValueError):
-        sa.set_input_attenuation(sa.min_attenuation - 1)
+        sa.set_input_attenuation(sa.min_attenuation_db - 1)
     with pytest.raises(ValueError):
-        sa.set_input_attenuation(sa.max_attenuation + 1)
+        sa.set_input_attenuation(sa.max_attenuation_db + 1)
 
 
 def test_ref_level(sa: SpectrumAnalyser):
@@ -124,9 +115,12 @@ def test_marker_power(sa: SpectrumAnalyser):
     with pytest.raises(ValueError):
         sa.get_marker_enabled_state(sa.max_num_markers + 1)
     with pytest.raises(ValueError):
-        sa.set_marker_frequency(sa.min_freq, sa.max_num_markers + 1)
+        sa.set_marker_freq(
+            sa.max_num_markers + 1,
+            sa.min_freq,
+        )
     with pytest.raises(ValueError):
-        sa.get_marker_frequency(sa.max_num_markers + 1)
+        sa.get_marker_freq(sa.max_num_markers + 1)
     with pytest.raises(ValueError):
         sa.measure_marker_power(sa.max_num_markers + 1)
     with pytest.raises(ValueError):

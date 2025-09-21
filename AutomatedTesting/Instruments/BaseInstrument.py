@@ -2,7 +2,7 @@
 import logging
 import os
 import signal
-from threading import Lock, Thread
+from threading import Lock, Thread, Event
 from time import sleep
 from typing import Optional
 
@@ -52,6 +52,7 @@ class BaseInstrument:
         self.kwargs = kwargs
         self.only_software_control = only_software_control
         self.error_process = None
+        self.terminate_error_process_flag = Event()
         self.instrument_name = name
 
         self.dev = None  # Connection to the device
@@ -72,11 +73,9 @@ class BaseInstrument:
         #  under software control (as opposed to being used interactively)
         if self.only_software_control:
             self.reset()
-            pid = os.getpid()
             self.error_process = Thread(
-                target=self.check_instrument_errors, args=[pid], daemon=True
+                target=self.check_instrument_errors, args=[os.getpid()], daemon=True
             )
-
             self.error_process.start()
 
         self.logger.info(f"{self.name} initialised")
@@ -87,6 +86,9 @@ class BaseInstrument:
     def cleanup(self):
         self.logger.info(f"Shutting down connection to {self.name}")
         if self.only_software_control:
+            if self.error_process:
+                self.terminate_error_process_flag.set()
+                self.error_process.join()
             self.set_local_control()
         if self.dev:
             self.dev.close()
@@ -139,7 +141,7 @@ class BaseInstrument:
         and decides whether to flag an issue to the main process
         """
         self.logger.debug(f"Started error monitoring thread for {self.name}")
-        while True:
+        while not self.terminate_error_process_flag.is_set():
             sleep(3)
             error_list = self.get_instrument_errors()
             if error_list:

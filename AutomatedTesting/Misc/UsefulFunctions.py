@@ -43,7 +43,6 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
 
 
 def get_key_from_dict_value(dict: dict, value: Any):
-    print(dict)
     reversed_dict = {v: k for k, v in dict.items()}
     return reversed_dict[value]
 
