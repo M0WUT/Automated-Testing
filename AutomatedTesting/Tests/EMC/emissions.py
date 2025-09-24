@@ -37,7 +37,15 @@ class EmissionsMeasurementRange:
                 (self.stop_freq - self.start_freq) / 1e6
             )
 
-    def perform_measurement(self, sa: SpectrumAnalyser)
+    def measure(self, sa: SpectrumAnalyser):
+        return sa.perform_multi_part_sweep(
+            self.start_freq,
+            self.stop_freq,
+            step_size=int(0.5 * self.rbw_hz),
+            ensure_stop_freq_is_covered=False,
+            detector_types=self.detector_types,
+            seconds_per_mhz=self.seconds_per_mhz,
+        )
 
 
 class EmissionsLimitLine:
@@ -72,4 +80,12 @@ class EmissionsLimitLine:
 class EmissionsMeasurement:
     name: str
     measurements: list[EmissionsMeasurementRange]
-    limits: Optional[list[EmissionsLimitLine]]
+    limits: Optional[list[EmissionsLimitLine]] = None
+
+    def measure(
+        self, spectrum_analyser: SpectrumAnalyser
+    ) -> SpectrumAnalyser.SpectrumAnalyserMeasurements:
+        results = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+        for x in self.measurements:
+            results += x.measure(spectrum_analyser)
+        return results

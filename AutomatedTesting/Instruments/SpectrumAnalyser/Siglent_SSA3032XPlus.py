@@ -209,8 +209,8 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
     def _trigger_sweep(self) -> None:
         self._write(":INIT:IMM")
 
-    def _get_trace_data(self) -> list[float]:
-        return [float(x) for x in self._query(":TRAC:DATA?").split(",")]
+    def _get_trace_data(self, trace_num: int) -> list[float]:
+        return [float(x) for x in self._query(f":TRAC{trace_num}:DATA?").split(",")]
 
     def _set_marker_enabled_state(self, marker_num: int, enabled: bool) -> None:
         self._write(f":CALC:MARK{marker_num}:STAT {'ON' if enabled else 'OFF'}")

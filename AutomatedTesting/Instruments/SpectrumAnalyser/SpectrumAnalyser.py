@@ -3,6 +3,7 @@ from enum import Enum, auto
 from logging import Logger
 from typing import Optional
 from math import ceil, floor
+from dataclasses import dataclass
 
 # Third party imports
 from numpy import linspace
@@ -10,7 +11,6 @@ from pyvisa import ResourceManager
 
 # Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
-from AutomatedTesting.Misc.UsefulFunctions import prefixify
 
 
 class SpectrumAnalyser(EntireInstrument):
@@ -43,54 +43,51 @@ class SpectrumAnalyser(EntireInstrument):
         VOLTS = auto()
         WATTS = auto()
 
+    @dataclass
     class SpectrumAnalyserMeasurements:
-        def __init__(
-            self,
-            freqs: Optional[list[float]] = None,
-            datapoints: Optional[
-                dict["SpectrumAnalyser.DetectorType", list[float]]
-            ] = None,
-        ):
-            self.freqs: list[float] = freqs if freqs else []
-            self.datapoints: dict["SpectrumAnalyser.DetectorType", list[float]] = (
-                datapoints if datapoints else {}
-            )
+        datapoints: dict["SpectrumAnalyser.DetectorType", list[tuple[float, float]]]
 
-        def __add__(self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurements"):
+        def __add__(
+            self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurements"
+        ) -> "SpectrumAnalyser.SpectrumAnalyserMeasurements":
             """
             Allows combination of the results of multiple sweeps
             e.g. EMC emissions measured with different settings
             """
-            if not self.datapoints.keys() == other.datapoints.keys():
-                raise ValueError(
-                    "Cannot combine measurements with different detector types"
+            result = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+
+            self_detectors = [x for x in self.datapoints]
+            other_detectors = [x for x in other.datapoints]
+
+            for detector_type in set(self_detectors + other_detectors):
+                try:
+                    self_freqs = [x[0] for x in self.datapoints[detector_type]]
+                except KeyError:
+                    self_freqs = []
+
+                try:
+                    other_freqs = [x[0] for x in other.datapoints[detector_type]]
+                except KeyError:
+                    other_freqs = []
+
+                common_freqs = set(self_freqs) & set(other_freqs)
+                assert (
+                    not common_freqs
+                ), f"Multiple measurements found at frequency: {common_freqs}"
+
+                # It's cleaner to make sure both datapoints dicts have something for
+                # each detector type rather than handle KeyErrors in the combination
+
+                if detector_type not in self_detectors:
+                    self.datapoints[detector_type] = []
+
+                if detector_type not in other_detectors:
+                    other.datapoints[detector_type] = []
+
+                result.datapoints[detector_type] = sorted(
+                    self.datapoints[detector_type] + other.datapoints[detector_type],
+                    key=lambda x: x[0],
                 )
-
-            # Sanity check inputs as this will go horribly wrong if not
-            assert all([len(x) == len(self.freqs) for x in self.datapoints.values()])
-            assert all([len(x) == len(other.freqs) for x in other.datapoints.values()])
-            for x in self.freqs:
-                if x in other.freqs:
-                    raise RuntimeError(
-                        f"Frequency {prefixify(x, 'Hz')} found in both measurements"
-                    )
-
-            result = SpectrumAnalyser.SpectrumAnalyserMeasurements()
-            result.freqs = self.freqs + other.freqs
-            result.freqs.sort()
-            result.datapoints = {}
-
-            for detector_type in self.datapoints.keys():
-                # Combine measurements to (freq, value) tuples
-                self_tuples = [
-                    x for x in zip(self.freqs, self.datapoints[detector_type])
-                ]
-                other_tuples = [
-                    x for x in zip(other.freqs, other.datapoints[detector_type])
-                ]
-                combined_tuples = self_tuples + other_tuples
-                combined_tuples.sort(key=lambda x: x[0])
-                result.datapoints[detector_type] = [x[1] for x in combined_tuples]
 
             return result
 
@@ -240,7 +237,7 @@ class SpectrumAnalyser(EntireInstrument):
     def _trigger_sweep(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def _get_trace_data(self) -> list[float]:
+    def _get_trace_data(self, trace_num: int) -> list[float]:
         raise NotImplementedError  # pragma: no cover
 
     def _set_marker_enabled_state(self, marker_num: int, enabled_bool) -> None:
@@ -764,7 +761,7 @@ class SpectrumAnalyser(EntireInstrument):
             None
         """
         self.validate_trace_num(trace_num)
-        return self._get_trace_data()
+        return self._get_trace_data(trace_num)
 
     def get_trace_freqs(self) -> list[float]:
         """
@@ -1060,7 +1057,7 @@ class SpectrumAnalyser(EntireInstrument):
                 <start-freq> + N * <step-size> <= stop_freq
 
         """
-        results = SpectrumAnalyser.SpectrumAnalyserMeasurements()
+        results = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
 
         if detector_types is None:
             detector_types = [SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
@@ -1110,9 +1107,8 @@ class SpectrumAnalyser(EntireInstrument):
                 self.trigger_sweep(num_sweeps)
 
                 # Add datapoints to results
-                results.freqs += self.get_trace_freqs()
                 for trace_index, detector_type in enumerate(detector_types):
-                    results.datapoints[detector_type] += self.get_trace_data(
+                    results.datapoints[detector_type] += self.get_trace_data_with_freqs(
                         trace_index + 1
                     )
 
@@ -1136,16 +1132,9 @@ class SpectrumAnalyser(EntireInstrument):
                 self.trigger_sweep(num_sweeps)
                 # Add valid datapoints to results - there will be unnecessary points
                 # at the start
-                response_freqs = self.get_trace_freqs()
-                results.freqs += [
-                    x
-                    for x in response_freqs
-                    if x >= freqs_to_measure[current_start_freq_index]
-                ]
-
                 for trace_index, detector_type in enumerate(detector_types):
                     results.datapoints[detector_type] += [
-                        x[1]
+                        x
                         for x in self.get_trace_data_with_freqs(trace_index + 1)
                         if x[0] >= freqs_to_measure[current_start_freq_index]
                     ]
@@ -1153,8 +1142,10 @@ class SpectrumAnalyser(EntireInstrument):
                 current_start_freq_index = stop_freq_index
                 num_remaining_points = 0
 
-        # Sanity check all the things
-        assert freqs_to_measure == results.freqs
+        # Sanity check we'be ended up with the right frequenceies
+        for datapoints in results.datapoints.values():
+            assert freqs_to_measure == [x[0] for x in datapoints]
+
         return results
 
     def set_y_axis_units(self, units: YAxisUnits) -> None:
