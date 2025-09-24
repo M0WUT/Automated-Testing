@@ -274,9 +274,19 @@ def test_multipart_sweep(sa: SpectrumAnalyser):
                 seconds_per_mhz=1e-3,
             )
             if ensure_stop_freq_is_covered:
-                assert results.freqs[-1] >= max_freq
+                assert (
+                    results.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][-1][
+                        0
+                    ]
+                    >= max_freq
+                )
             else:
-                assert results.freqs[-1] <= max_freq
+                assert (
+                    results.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][-1][
+                        0
+                    ]
+                    <= max_freq
+                )
         # Check correct behaviour when seconds_per_mhz is not defined
         # Use convenient values left over from last iteration of main test
         sa.perform_multi_part_sweep(
@@ -336,59 +346,52 @@ def test_sweep_time(sa: SpectrumAnalyser):
 
 def test_spectrum_analyser_measurement_combination(spectrum_analyser):
     x = SpectrumAnalyser.SpectrumAnalyserMeasurements(
-        freqs=[1, 2, 3, 4],
         datapoints={
-            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
-            SpectrumAnalyser.DetectorType.AVERAGE: [9, 10, 11, 12],
+            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [(0, 1), (2, 3)],
+            SpectrumAnalyser.DetectorType.AVERAGE: [(4, 5), (6, 7)],
+            # Have a detector not present in the other to check
+            # correct response
+            SpectrumAnalyser.DetectorType.NEGATIVE_PEAK: [(8, 9), (10, 11)],
         },
     )
 
     y = SpectrumAnalyser.SpectrumAnalyserMeasurements(
-        freqs=[5, 6, 7, 8],
         datapoints={
-            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [13, 14, 15, 16],
-            SpectrumAnalyser.DetectorType.AVERAGE: [17, 18, 19, 20],
+            SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [(12, 13), (14, 15)],
+            SpectrumAnalyser.DetectorType.AVERAGE: [(16, 17), (18, 19)],
+            # Have a detector not present in the other to check
+            # correct response
+            SpectrumAnalyser.DetectorType.QUASI_PEAK: [(20, 21), (22, 23)],
         },
     )
 
     z = x + y
-    assert z.freqs == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert z.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK] == [
-        5,
-        6,
-        7,
-        8,
-        13,
-        14,
-        15,
-        16,
-    ]
-    assert z.datapoints[SpectrumAnalyser.DetectorType.AVERAGE] == [
-        9,
-        10,
-        11,
-        12,
-        17,
-        18,
-        19,
-        20,
-    ]
 
-    # Check different detector types raises Error
-    with pytest.raises(ValueError):
-        _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurements(
-            freqs=[5, 6, 7, 8],
-            datapoints={
-                SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
-            },
-        )
+    assert (
+        z.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
+        == x.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
+        + y.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
+    )
+    assert (
+        z.datapoints[SpectrumAnalyser.DetectorType.AVERAGE]
+        == x.datapoints[SpectrumAnalyser.DetectorType.AVERAGE]
+        + y.datapoints[SpectrumAnalyser.DetectorType.AVERAGE]
+    )
+    assert (
+        z.datapoints[SpectrumAnalyser.DetectorType.NEGATIVE_PEAK]
+        == x.datapoints[SpectrumAnalyser.DetectorType.NEGATIVE_PEAK]
+    )
+    assert (
+        z.datapoints[SpectrumAnalyser.DetectorType.QUASI_PEAK]
+        == y.datapoints[SpectrumAnalyser.DetectorType.QUASI_PEAK]
+    )
 
     # Check overlapping frequencies raises Error
-    with pytest.raises(RuntimeError):
+    with pytest.raises(AssertionError):
         _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurements(
-            freqs=[4, 5, 6, 7],
             datapoints={
-                SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [5, 6, 7, 8],
-                SpectrumAnalyser.DetectorType.AVERAGE: [17, 18, 19, 20],
+                SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [
+                    x.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][0]
+                ],
             },
         )
