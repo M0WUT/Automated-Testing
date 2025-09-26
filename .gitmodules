@@ -1,0 +1,3 @@
+[submodule "AutomatedTesting/AutomatedTestingSecrets"]
+	path = AutomatedTesting/AutomatedTestingSecrets
+	url = git@github.com:M0WUT/AutomatedTestingSecrets.git

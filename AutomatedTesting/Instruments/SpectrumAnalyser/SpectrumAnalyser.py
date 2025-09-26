@@ -11,6 +11,7 @@ from pyvisa import ResourceManager
 
 # Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
+from AutomatedTesting.Misc.units import AmplitudeUnits
 
 
 class SpectrumAnalyser(EntireInstrument):
@@ -23,10 +24,10 @@ class SpectrumAnalyser(EntireInstrument):
         EMI = auto()
 
     class DetectorType(Enum):
-        POSITIVE_PEAK = auto()
-        NEGATIVE_PEAK = auto()
-        AVERAGE = auto()
-        QUASI_PEAK = auto()
+        POSITIVE_PEAK = "Peak"
+        NEGATIVE_PEAK = "Negative Peak"
+        AVERAGE = "Average"
+        QUASI_PEAK = "Quasi-Peak"
 
     class TraceMode(Enum):
         CLEAR_WRITE = auto()
@@ -35,13 +36,6 @@ class SpectrumAnalyser(EntireInstrument):
         VIEW = auto()
         BLANK = auto()
         AVERAGE = auto()
-
-    class YAxisUnits(Enum):
-        DBM = auto()
-        DBMV = auto()
-        DBUV = auto()
-        VOLTS = auto()
-        WATTS = auto()
 
     @dataclass
     class SpectrumAnalyserMeasurements:
@@ -271,10 +265,10 @@ class SpectrumAnalyser(EntireInstrument):
     def _get_detector_type(self, trace_num: int) -> DetectorType:
         raise NotImplementedError  # pragma: no cover
 
-    def _set_y_axis_units(self, units: YAxisUnits) -> None:
+    def _set_y_axis_units(self, units: AmplitudeUnits) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def _get_y_axis_units(self) -> YAxisUnits:
+    def _get_y_axis_units(self) -> AmplitudeUnits:
         raise NotImplementedError  # pragma: no cover
 
     def _set_preamp_enabled_state(self, enabled: bool):
@@ -728,9 +722,7 @@ class SpectrumAnalyser(EntireInstrument):
         """
         return self._get_ref_level()
 
-    def trigger_sweep(
-        self, num_sweeps: int = 1, timeout_s: Optional[float] = None
-    ) -> None:
+    def trigger_sweep(self, num_sweeps: int = 1, timeout_s: int = 60) -> None:
         """
         Triggers a sweep and blocks until completion
 
@@ -1037,6 +1029,7 @@ class SpectrumAnalyser(EntireInstrument):
         detector_types: Optional[list[DetectorType]] = None,
         seconds_per_mhz: Optional[float] = None,
         num_sweeps: int = 1,
+        units: AmplitudeUnits = AmplitudeUnits.DBM,
     ) -> SpectrumAnalyserMeasurements:
         """
         Some sweeps may require > 1 sweep to capture at sufficient resolution
@@ -1058,6 +1051,8 @@ class SpectrumAnalyser(EntireInstrument):
 
         """
         results = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+
+        self.set_y_axis_units(units)
 
         if detector_types is None:
             detector_types = [SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
@@ -1148,12 +1143,12 @@ class SpectrumAnalyser(EntireInstrument):
 
         return results
 
-    def set_y_axis_units(self, units: YAxisUnits) -> None:
+    def set_y_axis_units(self, units: AmplitudeUnits) -> None:
         """
         Sets the units in use for the y-axis
 
         Args:
-            units (YAxisUnits): which units to use
+            units (AmplitudeUnits): which units to use
 
         Returns:
             None
@@ -1166,7 +1161,7 @@ class SpectrumAnalyser(EntireInstrument):
         if self.verify:
             assert self.get_y_axis_units() == units
 
-    def get_y_axis_units(self) -> YAxisUnits:
+    def get_y_axis_units(self) -> AmplitudeUnits:
         """
         Returns the units in use for the y-axis
 
@@ -1174,7 +1169,7 @@ class SpectrumAnalyser(EntireInstrument):
             None
 
         Returns:
-            YAxisUnits: which units are in use
+            AmplitudeUnits: which units are in use
 
         Raises:
             None

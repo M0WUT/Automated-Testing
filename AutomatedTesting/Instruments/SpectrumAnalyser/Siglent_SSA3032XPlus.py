@@ -9,6 +9,7 @@ from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
 from AutomatedTesting.Misc.UsefulFunctions import get_key_from_dict_value
+from AutomatedTesting.Misc.units import AmplitudeUnits
 
 
 class SiglentSSA3032XPlus(SpectrumAnalyser):
@@ -100,11 +101,11 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         }
 
         self._y_axis_unit_str = {
-            SpectrumAnalyser.YAxisUnits.DBM: "DBM",
-            SpectrumAnalyser.YAxisUnits.DBMV: "DBMV",
-            SpectrumAnalyser.YAxisUnits.DBUV: "DBUV",
-            SpectrumAnalyser.YAxisUnits.VOLTS: "V",
-            SpectrumAnalyser.YAxisUnits.WATTS: "W",
+            AmplitudeUnits.DBM: "DBM",
+            AmplitudeUnits.DBMV: "DBMV",
+            AmplitudeUnits.DBUV: "DBUV",
+            AmplitudeUnits.VOLTS: "V",
+            AmplitudeUnits.WATTS: "W",
         }
 
     #####################################
@@ -247,10 +248,10 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         response = self._query(f":DET:TRAC{trace_num}?")
         return get_key_from_dict_value(self._detector_str, response)
 
-    def _set_y_axis_units(self, units: SpectrumAnalyser.YAxisUnits) -> None:
+    def _set_y_axis_units(self, units: AmplitudeUnits) -> None:
         self._write(f":UNIT:POW {self._y_axis_unit_str[units]}")
 
-    def _get_y_axis_units(self) -> SpectrumAnalyser.YAxisUnits:
+    def _get_y_axis_units(self) -> AmplitudeUnits:
         response = self._query(":UNIT:POW?")
         return get_key_from_dict_value(self._y_axis_unit_str, response)
 

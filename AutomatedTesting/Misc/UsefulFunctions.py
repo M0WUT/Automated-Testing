@@ -36,7 +36,7 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
             if decimal_places:
                 x = round(x, decimal_places)
             result = str(x)
-            result.removesuffix(".0")
+            result = result.removesuffix(".0")
 
             return f"{result}{prefix}{units}"
     raise ValueError(f"Could not convert {x} to SI notation")

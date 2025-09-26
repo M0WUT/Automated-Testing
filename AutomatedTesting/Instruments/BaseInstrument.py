@@ -243,20 +243,24 @@ class BaseInstrument:
             self.lock.release()
         return response
 
-    def wait_until_op_complete(self, timeout_s: Optional[float] = None):
+    def wait_until_op_complete(self, timeout_s: int = 60):
         """
         Blocks until current commmands have all been executed
         """
-        self._query_with_increased_timeout("*OPC?", timeout_s)
+        for x in range(timeout_s):
+            try:
+                self._query_with_increased_timeout("*OPC?", timeout_s * 1000)
+                return
+            except VisaIOError:
+                pass
+        raise RuntimeError
 
-    def _query_with_increased_timeout(
-        self, query: str, timeout_s: Optional[float] = None
-    ):
+    def _query_with_increased_timeout(self, query: str, timeout_s: float):
         old_timeout = self.dev.timeout  # type: ignore
         try:
             # There seems to be a bug with setting timeout to None (should be infinite)
             # so set it to a week instead
-            self.dev.timeout = timeout_s if timeout_s else (86400000)  # type: ignore
+            self.dev.timeout = timeout_s * 1000 if timeout_s else (86400000)  # type: ignore
             result = self._query(query)
         finally:
             self.dev.timeout = old_timeout  # type: ignore
