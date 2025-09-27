@@ -1,0 +1,19 @@
+[project]
+name = "AutomatedTesting"
+version = "0.1"
+dependencies=[
+    "pytest",
+    "pytest-cov",
+    "pytest-flake8",
+    "Xlsxwriter",
+    "pyserial",
+    "pyvisa",
+    "pyvisa-py",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pandas",
+    "GitPython",
+    "pep8-naming",
+    "flake8",
+]

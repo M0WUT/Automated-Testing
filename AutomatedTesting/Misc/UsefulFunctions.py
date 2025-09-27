@@ -29,6 +29,12 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
     if x == agilent_overload_magic_number:
         return "OVLD"
 
+    sign_str = "-" if x < 0 else ""
+    x = abs(x)
+
+    if x == 0:
+        return f"0{units}"
+
     for exponent, prefix in si_prefixes.items():
         if x >= exponent:
             x /= exponent
@@ -38,7 +44,7 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
             result = str(x)
             result = result.removesuffix(".0")
 
-            return f"{result}{prefix}{units}"
+            return f"{sign_str}{result}{prefix}{units}"
     raise ValueError(f"Could not convert {x} to SI notation")
 
 
