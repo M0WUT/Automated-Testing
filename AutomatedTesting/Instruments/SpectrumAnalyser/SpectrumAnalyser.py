@@ -1,9 +1,12 @@
 # Standard imports
 from enum import Enum, auto
 from logging import Logger
-from typing import Optional
+from typing import Optional, Union
 from math import ceil, floor
 from dataclasses import dataclass
+from datetime import datetime
+import re
+from pathlib import Path
 
 # Third party imports
 from numpy import linspace
@@ -11,7 +14,8 @@ from pyvisa import ResourceManager
 
 # Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
-from AutomatedTesting.Misc.units import AmplitudeUnits
+from AutomatedTesting.Instruments.Transducer.Transducer import Transducer
+from AutomatedTesting.Misc.Units import AmplitudeUnits, FieldStrengthUnits
 
 
 class SpectrumAnalyser(EntireInstrument):
@@ -38,17 +42,24 @@ class SpectrumAnalyser(EntireInstrument):
         AVERAGE = auto()
 
     @dataclass
-    class SpectrumAnalyserMeasurements:
+    class SpectrumAnalyserMeasurement:
         datapoints: dict["SpectrumAnalyser.DetectorType", list[tuple[float, float]]]
+        units: Union[AmplitudeUnits, FieldStrengthUnits]
 
         def __add__(
-            self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurements"
-        ) -> "SpectrumAnalyser.SpectrumAnalyserMeasurements":
+            self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurement"
+        ) -> "SpectrumAnalyser.SpectrumAnalyserMeasurement":
             """
             Allows combination of the results of multiple sweeps
             e.g. EMC emissions measured with different settings
             """
-            result = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+            assert self.units == other.units, (
+                "Measurements to be combined have different "
+                f"units: {self.units} and {other.units}"
+            )
+            result = SpectrumAnalyser.SpectrumAnalyserMeasurement(
+                datapoints={}, units=self.units
+            )
 
             self_detectors = [x for x in self.datapoints]
             other_detectors = [x for x in other.datapoints]
@@ -84,6 +95,35 @@ class SpectrumAnalyser(EntireInstrument):
                 )
 
             return result
+
+        def save_to_file(
+            self,
+            results_dir: Optional[Path] = None,
+            filename_prefix: Optional[str] = None,
+        ) -> list[Path]:
+
+            written_paths = []
+
+            current_time_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            if results_dir is None:
+                results_dir = Path("results")
+            results_dir.mkdir(exist_ok=True)
+            for detector, measurements in self.datapoints.items():
+                filename_str = (
+                    f"{current_time_str}_{re.sub(' ', '-', detector.value)}.csv"
+                )
+                if filename_prefix:
+                    filename_str = f"{re.sub(' ', '-', filename_prefix)}_{filename_str}"
+
+                file_path = results_dir / filename_str
+
+                written_paths.append(file_path)
+
+                with open(file_path, "w") as file:
+                    file.write(f"Frequency (Hz), Amplitude ({self.units})\n")
+                    for x in measurements:
+                        file.write(f"{x[0]},{x[1]}\n")
+            return written_paths
 
     def __init__(
         self,
@@ -310,6 +350,8 @@ class SpectrumAnalyser(EntireInstrument):
         self.set_input_attenuation(20)
         self.enable_auto_sweep_time()
         self.set_sweep_mode(self.SweepMode.CONTINUOUS)
+        self.corrections = None
+        self.transducer = None
 
         super().__exit__(*args, **kwargs)
 
@@ -739,22 +781,6 @@ class SpectrumAnalyser(EntireInstrument):
             self._trigger_sweep()
             self.wait_until_op_complete(timeout_s)
 
-    def get_trace_data(self, trace_num: int = 1) -> list[float]:
-        """
-        Returns trace data
-
-        Args:
-            trace_num (int): Number of which trace to get data from
-
-        Returns:
-            list[float]: list of (power in y-axis units)
-
-        Raises:
-            None
-        """
-        self.validate_trace_num(trace_num)
-        return self._get_trace_data(trace_num)
-
     def get_trace_freqs(self) -> list[float]:
         """
         Returns a list of the swept frequency points
@@ -765,9 +791,7 @@ class SpectrumAnalyser(EntireInstrument):
         )
         return [float(x) for x in freqs]
 
-    def get_trace_data_with_freqs(
-        self, trace_num: int = 1
-    ) -> list[tuple[float, float]]:
+    def get_trace_data(self, trace_num: int = 1) -> SpectrumAnalyserMeasurement:
         """
         Returns trace data for a given trace number
 
@@ -781,10 +805,29 @@ class SpectrumAnalyser(EntireInstrument):
         Raises:
             None
         """
+        self.validate_trace_num(trace_num)
+
         if self.get_zero_span_enabled_state():
             raise RuntimeError("Cannot get frequency data in zero span mode")
 
-        return list(zip(self.get_trace_freqs(), self.get_trace_data(trace_num)))
+        freqs = self.get_trace_freqs()
+        data = self._get_trace_data(trace_num)
+        detector_type = self.get_detector_type(trace_num)
+        y_axis_units = self.get_y_axis_units()
+
+        datapoints = [x for x in zip(freqs, data)]
+        if self.corrections:
+            datapoints = [(f, self.corrections.correct(f, d)) for f, d in datapoints]
+        if self.transducer:
+            assert y_axis_units == self.transducer.output_units
+            datapoints = [
+                (f, self.transducer.conversion_func_output_to_input(f, d))
+                for f, d in datapoints
+            ]
+            y_axis_units = self.transducer.input_units
+        return SpectrumAnalyser.SpectrumAnalyserMeasurement(
+            {detector_type: datapoints}, y_axis_units
+        )
 
     def validate_marker_num(self, marker_num: int) -> None:
         """
@@ -1029,8 +1072,8 @@ class SpectrumAnalyser(EntireInstrument):
         detector_types: Optional[list[DetectorType]] = None,
         seconds_per_mhz: Optional[float] = None,
         num_sweeps: int = 1,
-        units: AmplitudeUnits = AmplitudeUnits.DBM,
-    ) -> SpectrumAnalyserMeasurements:
+        units: AmplitudeUnits | FieldStrengthUnits = AmplitudeUnits.DBM,
+    ) -> SpectrumAnalyserMeasurement:
         """
         Some sweeps may require > 1 sweep to capture at sufficient resolution
         e.g. for EMC measurements where there might be a small RBW,
@@ -1050,9 +1093,15 @@ class SpectrumAnalyser(EntireInstrument):
                 <start-freq> + N * <step-size> <= stop_freq
 
         """
-        results = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+        if self.transducer:
+            assert units == self.transducer.input_units
+        self.set_y_axis_units(
+            self.transducer.output_units if self.transducer else units
+        )
 
-        self.set_y_axis_units(units)
+        results = SpectrumAnalyser.SpectrumAnalyserMeasurement(
+            datapoints={}, units=units
+        )
 
         if detector_types is None:
             detector_types = [SpectrumAnalyser.DetectorType.POSITIVE_PEAK]
@@ -1060,7 +1109,6 @@ class SpectrumAnalyser(EntireInstrument):
         for trace_num, detector_type in enumerate(detector_types):
             self.set_detector_type(trace_num + 1, detector_type)
             self.set_trace_mode(trace_num + 1, SpectrumAnalyser.TraceMode.MAX_HOLD)
-            results.datapoints[detector_type] = []
 
         # Plus 1 for fencepost problem
         num_points_required = 1 + (stop_freq - start_freq) / step_size
@@ -1103,9 +1151,7 @@ class SpectrumAnalyser(EntireInstrument):
 
                 # Add datapoints to results
                 for trace_index, detector_type in enumerate(detector_types):
-                    results.datapoints[detector_type] += self.get_trace_data_with_freqs(
-                        trace_index + 1
-                    )
+                    results += self.get_trace_data(trace_index + 1)
 
                 # Update counters
                 current_start_freq_index += num_points_to_measure
@@ -1130,7 +1176,9 @@ class SpectrumAnalyser(EntireInstrument):
                 for trace_index, detector_type in enumerate(detector_types):
                     results.datapoints[detector_type] += [
                         x
-                        for x in self.get_trace_data_with_freqs(trace_index + 1)
+                        for x in self.get_trace_data(trace_index + 1).datapoints[
+                            detector_type
+                        ]
                         if x[0] >= freqs_to_measure[current_start_freq_index]
                     ]
 
@@ -1156,7 +1204,6 @@ class SpectrumAnalyser(EntireInstrument):
         Raises:
             AssertionError: if readback is not correct
         """
-
         self._set_y_axis_units(units)
         if self.verify:
             assert self.get_y_axis_units() == units
@@ -1319,3 +1366,7 @@ class SpectrumAnalyser(EntireInstrument):
         # Don't have disable function - that will happen when
         # sweep time is set manually
         self.set_sweep_time_auto_enabled_state(True)
+
+    def apply_transducer(self, transducer: Transducer) -> None:
+        super().apply_transducer(transducer)
+        self.set_y_axis_units(transducer.output_units)

@@ -9,7 +9,7 @@ from numpy import arange
 
 # Local imports
 from AutomatedTesting.Misc.UsefulFunctions import readable_freq
-from AutomatedTesting.Misc.units import Units
+from AutomatedTesting.Misc.Units import Units
 
 
 class PlotXAxisType(Enum):
@@ -32,14 +32,18 @@ def apply_default_plot_settings(
     ax.set_yscale("log" if y_axis_type == PlotXAxisType.LOGARITHMIC else "linear")
     if x_axis_units:
         x_tick_formatter = FuncFormatter(
-            lambda x, pos: f"{str(round(x * x_axis_units.scale_factor(),3)).removesuffix('.0')}"
+            lambda x, pos: (
+                f"{str(round(x * x_axis_units.scale_factor(),3)).removesuffix('.0')}"
+            )
         )
         ax.xaxis.set_major_formatter(x_tick_formatter)
         ax.set_xlabel(x_axis_units.label())
 
     if y_axis_units:
         y_tick_formatter = FuncFormatter(
-            lambda x, pos: f"{str(round(x * y_axis_units.scale_factor(),3)).removesuffix('.0')}"
+            lambda x, pos: (
+                f"{str(round(x * y_axis_units.scale_factor(),3)).removesuffix('.0')}"
+            )
         )
         ax.yaxis.set_major_formatter(y_tick_formatter)
         ax.set_ylabel(y_axis_units.label())

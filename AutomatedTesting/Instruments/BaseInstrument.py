@@ -4,7 +4,6 @@ import os
 import signal
 from threading import Lock, Thread, Event
 from time import sleep
-from typing import Optional
 
 # Third party imports
 from pyvisa import ResourceManager, VisaIOError
@@ -260,7 +259,9 @@ class BaseInstrument:
         try:
             # There seems to be a bug with setting timeout to None (should be infinite)
             # so set it to a week instead
-            self.dev.timeout = timeout_s * 1000 if timeout_s else (86400000)  # type: ignore
+            self.dev.timeout = (
+                timeout_s * 1000 if timeout_s else (86400000)  # type: ignore
+            )
             result = self._query(query)
         finally:
             self.dev.timeout = old_timeout  # type: ignore

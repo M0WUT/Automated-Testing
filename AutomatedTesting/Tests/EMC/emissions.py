@@ -1,7 +1,9 @@
 # Standard imports
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 from enum import StrEnum
+from pathlib import Path
+
 
 # Third party imports
 from matplotlib.axes import Axes
@@ -10,7 +12,7 @@ from matplotlib.axes import Axes
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
-from AutomatedTesting.Misc.units import AmplitudeUnits
+from AutomatedTesting.Misc.Units import AmplitudeUnits, FieldStrengthUnits
 
 
 class EmissionsType(StrEnum):
@@ -46,7 +48,11 @@ class EmissionsMeasurementRange:
                 (self.stop_freq - self.start_freq) / 1e6
             )
 
-    def measure(self, sa: SpectrumAnalyser, units: AmplitudeUnits = AmplitudeUnits.DBM):
+    def measure(
+        self,
+        sa: SpectrumAnalyser,
+        units: AmplitudeUnits | FieldStrengthUnits = AmplitudeUnits.DBM,
+    ):
         return sa.perform_multi_part_sweep(
             self.start_freq,
             self.stop_freq,
@@ -118,14 +124,25 @@ class EmissionsMeasurement:
     name: str
     measurements: list[EmissionsMeasurementRange]
     limits: Optional[list[EmissionsLimitLine]] = None
-    units: AmplitudeUnits = AmplitudeUnits.DBM  # Units to be used for plotting / limits
+    units: Union[AmplitudeUnits, FieldStrengthUnits] = (
+        AmplitudeUnits.DBM
+    )  # Units to be used for plotting / limits
 
     def measure(
-        self, spectrum_analyser: SpectrumAnalyser
-    ) -> SpectrumAnalyser.SpectrumAnalyserMeasurements:
-        results = SpectrumAnalyser.SpectrumAnalyserMeasurements(datapoints={})
+        self,
+        spectrum_analyser: SpectrumAnalyser,
+        save_results: bool = False,
+        results_dir: Optional[Path] = None,
+        results_filename_prefix: Optional[str] = None,
+    ) -> SpectrumAnalyser.SpectrumAnalyserMeasurement:
+        results = SpectrumAnalyser.SpectrumAnalyserMeasurement(
+            datapoints={}, units=self.units
+        )
         for x in self.measurements:
             results += x.measure(spectrum_analyser, self.units)
+
+        if save_results:
+            results.save_to_file(results_dir, results_filename_prefix)
         return results
 
     def run(self, spectrum_analyser: SpectrumAnalyser, ax: Axes):

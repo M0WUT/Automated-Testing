@@ -25,7 +25,7 @@ class Units(StrEnum):
         raise NotImplementedError
 
 
-class AmplitudeUnits(StrEnum):
+class AmplitudeUnits(Units):
 
     DBM = "dBm"
     DBMV = "dBmV"
@@ -43,7 +43,20 @@ class AmplitudeUnits(StrEnum):
         return f"Amplitude ({self.value})"
 
 
-class FrequencyUnits(StrEnum):
+class FieldStrengthUnits(Units):
+    DBUV_PER_M = "dBµV/m"
+    DBUA_PER_M = "dBµA/m"
+
+    def scale_factor(self) -> float:
+        # Don't really know what to do here as it's not just
+        # SI prefixes
+        return 1
+
+    def label(self) -> str:
+        return f"Field Strength ({self.value})"
+
+
+class FrequencyUnits(Units):
     GHZ = "GHz"
     MHZ = "MHz"
     KHZ = "kHz"
@@ -62,7 +75,7 @@ class FrequencyUnits(StrEnum):
         return f"Frequency ({self.value})"
 
 
-class TimeUnits(StrEnum):
+class TimeUnits(Units):
     HOURS = "h"
     MINUTES = "min"
     SECONDS = "s"

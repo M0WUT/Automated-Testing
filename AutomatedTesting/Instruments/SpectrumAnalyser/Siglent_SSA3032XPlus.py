@@ -9,7 +9,7 @@ from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
 from AutomatedTesting.Misc.UsefulFunctions import get_key_from_dict_value
-from AutomatedTesting.Misc.units import AmplitudeUnits
+from AutomatedTesting.Misc.Units import AmplitudeUnits
 
 
 class SiglentSSA3032XPlus(SpectrumAnalyser):
@@ -104,8 +104,13 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             AmplitudeUnits.DBM: "DBM",
             AmplitudeUnits.DBMV: "DBMV",
             AmplitudeUnits.DBUV: "DBUV",
-            AmplitudeUnits.VOLTS: "V",
-            AmplitudeUnits.WATTS: "W",
+            # Leaving as haven't implemented correction
+            # for linear measurement units
+            # By removing these, it'll throw
+            # an error when trying to
+            # use these units
+            # AmplitudeUnits.VOLTS: "V",
+            # AmplitudeUnits.WATTS: "W",
         }
 
     #####################################

@@ -1,8 +1,13 @@
+# Standard imports
 from dataclasses import dataclass
 from typing import Optional, Any
+from math import log10
 
+# Third party imports
 import numpy
 from scipy import stats
+
+# Local imports
 
 
 def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -> str:
@@ -169,6 +174,54 @@ def best_fit_line_with_known_gradient(
 
     # Failed to find appropriate line
     return None
+
+
+def db_to_power(x: float) -> float:
+    return 10 ** (x / 10)
+
+
+def power_to_db(x: float) -> float:
+    return 10 * log10(x)
+
+
+def dbm_to_power(x: float) -> float:
+    return db_to_power(x - 30)
+
+
+def power_to_dbm(x: float) -> float:
+    return 30 + power_to_db(x)
+
+
+def db_to_power_list(x: list[float]) -> list[float]:
+    return [db_to_power(y) for y in x]
+
+
+def power_to_db_list(x: list[float]) -> list[float]:
+    return [power_to_db(y) for y in x]
+
+
+def dbm_to_power_list(x: list[float]) -> list[float]:
+    return [dbm_to_power(y) for y in x]
+
+
+def power_to_dbm_list(x: list[float]) -> list[float]:
+    return [power_to_dbm(y) for y in x]
+
+
+def db_to_amplitude(x: float) -> float:
+    return 10 ** (x / 20)
+
+
+def amplitude_to_db(x: float) -> float:
+    return 20 * log10(x)
+
+
+def db_to_amplitude_list(x: list[float]) -> list[float]:
+    return [db_to_amplitude(y) for y in x]
+
+
+def amplitude_to_db_list(x: list[float]) -> list[float]:
+    return [amplitude_to_db(y) for y in x]
 
 
 if __name__ == "__main__":

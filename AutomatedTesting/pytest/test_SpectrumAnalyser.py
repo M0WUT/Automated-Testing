@@ -9,12 +9,15 @@ from AutomatedTesting.Instruments.InstrumentConfig import ssa3032x
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
+from AutomatedTesting.Instruments.Transducer.TekboxTBTC1 import TekboxTBTC1
+from AutomatedTesting.Misc.Corrections import Corrections
+from AutomatedTesting.Misc.Units import AmplitudeUnits
 
 
 pytestmark = pytest.mark.parametrize("spectrum_analyser", [ssa3032x])
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def sa(spectrum_analyser):
     with spectrum_analyser:
         yield spectrum_analyser
@@ -222,7 +225,7 @@ def test_trace_data(sa: SpectrumAnalyser):
     sa.enable_zero_span()
     sa.trigger_sweep()
     with pytest.raises(RuntimeError):
-        sa.get_trace_data_with_freqs()
+        sa.get_trace_data()
 
 
 def test_marker_power(sa: SpectrumAnalyser):
@@ -345,7 +348,7 @@ def test_sweep_time(sa: SpectrumAnalyser):
 
 
 def test_spectrum_analyser_measurement_combination(spectrum_analyser):
-    x = SpectrumAnalyser.SpectrumAnalyserMeasurements(
+    x = SpectrumAnalyser.SpectrumAnalyserMeasurement(
         datapoints={
             SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [(0, 1), (2, 3)],
             SpectrumAnalyser.DetectorType.AVERAGE: [(4, 5), (6, 7)],
@@ -353,9 +356,10 @@ def test_spectrum_analyser_measurement_combination(spectrum_analyser):
             # correct response
             SpectrumAnalyser.DetectorType.NEGATIVE_PEAK: [(8, 9), (10, 11)],
         },
+        units=AmplitudeUnits.DBM,
     )
 
-    y = SpectrumAnalyser.SpectrumAnalyserMeasurements(
+    y = SpectrumAnalyser.SpectrumAnalyserMeasurement(
         datapoints={
             SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [(12, 13), (14, 15)],
             SpectrumAnalyser.DetectorType.AVERAGE: [(16, 17), (18, 19)],
@@ -363,6 +367,7 @@ def test_spectrum_analyser_measurement_combination(spectrum_analyser):
             # correct response
             SpectrumAnalyser.DetectorType.QUASI_PEAK: [(20, 21), (22, 23)],
         },
+        units=AmplitudeUnits.DBM,
     )
 
     z = x + y
@@ -388,10 +393,37 @@ def test_spectrum_analyser_measurement_combination(spectrum_analyser):
 
     # Check overlapping frequencies raises Error
     with pytest.raises(AssertionError):
-        _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurements(
+        _ = x + SpectrumAnalyser.SpectrumAnalyserMeasurement(
             datapoints={
                 SpectrumAnalyser.DetectorType.POSITIVE_PEAK: [
                     x.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][0]
                 ],
             },
+            units=AmplitudeUnits.DBM,
         )
+
+
+def test_transducer(sa: SpectrumAnalyser):
+    sa.apply_transducer(TekboxTBTC1())
+    sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    sa.get_trace_data()
+
+
+def test_correction(sa: SpectrumAnalyser):
+    sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    sa.apply_corrections(Corrections([(0, 0), (100e9, -10)]))
+    sa.get_trace_data()
+
+    # Check that a measurement without complete correction data throws an error
+    sa.apply_corrections(Corrections([(0, 0), (sa.max_freq - 1, -10)]))
+    with pytest.raises(ValueError):
+        sa.get_trace_data()
+
+
+def test_file_saving(sa: SpectrumAnalyser):
+    sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    x = sa.get_trace_data()
+    paths = x.save_to_file(filename_prefix="test")
+    for p in paths:
+        assert p.exists()
+        p.unlink()

@@ -1,8 +1,14 @@
+# Standard imports
 from logging import Logger
+from typing import Optional
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+from AutomatedTesting.Instruments.Transducer.Transducer import Transducer
+from AutomatedTesting.Misc.Corrections import Corrections
 
 
 class EntireInstrument(BaseInstrument):
@@ -23,6 +29,8 @@ class EntireInstrument(BaseInstrument):
         expected_idn_response: str,
         verify: bool,
         logger: Logger,
+        corrections: Optional[Corrections] = None,
+        transducer: Optional[Transducer] = None,
         **kwargs,
     ):
         super().__init__(
@@ -36,9 +44,8 @@ class EntireInstrument(BaseInstrument):
         )
         self.reserved = False  # Whether this instrument is in use
         self.name = self.name
-
-        # Used to remember previous freq to avoid continually updating it
-        self.centreFreq = 0
+        self.corrections = corrections
+        self.transducer = transducer
 
     def reserve(self, purpose: str):
         """
@@ -56,3 +63,9 @@ class EntireInstrument(BaseInstrument):
         self.logger.debug(f"{self.name} freed from role as {self.name}")
         self.name = self.instrument_name
         self.reserved = False
+
+    def apply_corrections(self, corrections: Corrections) -> None:
+        self.corrections = corrections
+
+    def apply_transducer(self, transducer: Transducer) -> None:
+        self.transducer = transducer

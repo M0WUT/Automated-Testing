@@ -13,3 +13,4 @@ linux-gpib/*
 *.out
 *.csv
 scratchpad.*
+TODO.md
