@@ -12,24 +12,24 @@ from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 from AutomatedTesting.Misc.Units import Units
 
 
-class PlotXAxisType(Enum):
+class PlotAxisType(Enum):
     LINEAR = auto()
     LOGARITHMIC = auto()
 
 
 def apply_default_plot_settings(
     ax: Axes,
-    x_axis_type: PlotXAxisType = PlotXAxisType.LINEAR,
+    x_axis_type: PlotAxisType = PlotAxisType.LINEAR,
     x_axis_units: Optional[Units] = None,
-    y_axis_type: PlotXAxisType = PlotXAxisType.LINEAR,
+    y_axis_type: PlotAxisType = PlotAxisType.LINEAR,
     y_axis_units: Optional[Units] = None,
 ) -> None:
 
-    ax.legend()
+    ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     ax.grid(axis="both", which="major", color=(0.6, 0.6, 0.6))
     ax.grid(axis="both", which="minor", color=(0.9, 0.9, 0.9))
-    ax.set_xscale("log" if x_axis_type == PlotXAxisType.LOGARITHMIC else "linear")
-    ax.set_yscale("log" if y_axis_type == PlotXAxisType.LOGARITHMIC else "linear")
+    ax.set_xscale("log" if x_axis_type == PlotAxisType.LOGARITHMIC else "linear")
+    ax.set_yscale("log" if y_axis_type == PlotAxisType.LOGARITHMIC else "linear")
     if x_axis_units:
         x_tick_formatter = FuncFormatter(
             lambda x, pos: (
@@ -51,9 +51,9 @@ def apply_default_plot_settings(
 
 def apply_default_emissions_plot_settings(
     ax: Axes,
-    x_axis_type: PlotXAxisType = PlotXAxisType.LOGARITHMIC,
+    x_axis_type: PlotAxisType = PlotAxisType.LOGARITHMIC,
     x_axis_units: Optional[Units] = None,
-    y_axis_type: PlotXAxisType = PlotXAxisType.LINEAR,
+    y_axis_type: PlotAxisType = PlotAxisType.LINEAR,
     y_axis_units: Optional[Units] = None,
 ) -> None:
     apply_default_plot_settings(
@@ -63,5 +63,11 @@ def apply_default_emissions_plot_settings(
     start = round(start, -1)
     ax.yaxis.set_ticks(arange(start, end, 10))
     ax.yaxis.set_ticks(arange(start, end, 2), minor=True)
-    if x_axis_type == PlotXAxisType.LOGARITHMIC:
+
+    if x_axis_type == PlotAxisType.LOGARITHMIC:
         ax.xaxis.set_major_formatter(lambda x, _: readable_freq(x))
+
+    if x_axis_units:
+        ax.set_xlabel(f"Frequency ({x_axis_units.value})")
+    else:
+        ax.set_xlabel("Frequency")
