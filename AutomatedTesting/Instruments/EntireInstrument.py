@@ -1,5 +1,4 @@
 # Standard imports
-from logging import Logger
 import logging
 from typing import Optional
 

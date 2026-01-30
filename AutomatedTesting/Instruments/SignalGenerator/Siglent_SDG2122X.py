@@ -1,8 +1,10 @@
-import logging
+# Standard imports
 from typing import Tuple
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.SignalGenerator.SignalGenerator import (
     SignalGenerator,
     SignalGeneratorChannel,

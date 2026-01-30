@@ -15,7 +15,7 @@ from AutomatedTesting.Instruments.Oscilloscope.Keysight_MSOX2024A import (
 )
 from AutomatedTesting.Instruments.PowerMeter.Agilent_U2001A import AgilentU2001A
 from AutomatedTesting.Instruments.PowerSupply.Siglent_SPD3303X import SiglentSPD3303X
-from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import Tenma722535, Tenma722940
+from AutomatedTesting.Instruments.PowerSupply.TenmaPSU import Tenma722940
 from AutomatedTesting.Instruments.SignalGenerator.Agilent_E4433B import AgilentE4433B
 from AutomatedTesting.Instruments.SignalGenerator.RohdeAndSchwarz_SMB100A import (
     RohdeAndSchwarzSMB100A,

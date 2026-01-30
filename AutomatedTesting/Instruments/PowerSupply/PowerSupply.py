@@ -1,11 +1,9 @@
 # Standard imports
-import logging
 
 # Third party imports
 
 # Local imports
 from AutomatedTesting.Instruments.MultichannelInstrument import (
-    InstrumentChannel,
     MultichannelInstrument,
     SourceChannel,
 )

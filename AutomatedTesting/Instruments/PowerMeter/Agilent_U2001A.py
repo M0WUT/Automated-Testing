@@ -1,7 +1,9 @@
-from logging import Logger
+# Standard imports
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.PowerMeter.PowerMeter import PowerMeter
 from AutomatedTesting.Misc.UsefulFunctions import readable_freq
 

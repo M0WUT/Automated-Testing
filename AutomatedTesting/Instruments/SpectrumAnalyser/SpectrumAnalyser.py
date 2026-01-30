@@ -1,6 +1,5 @@
 # Standard imports
 from enum import Enum, auto
-from logging import Logger
 from typing import Optional
 from math import ceil, floor
 from dataclasses import dataclass

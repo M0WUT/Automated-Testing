@@ -1,5 +1,4 @@
 # Standard impots
-from logging import Logger
 
 # Third party imports
 from pyvisa import ResourceManager

@@ -1,16 +1,14 @@
 # Standard imports
-import logging
 from time import sleep
 
+# Third party imports
 from pyvisa import ResourceManager
 
-# Third party imports
+# Local imports
 from AutomatedTesting.Instruments.PowerSupply.PowerSupply import (
     PowerSupply,
     PowerSupplyChannel,
 )
-
-# Local imports
 
 
 class SiglentSPD3303X(PowerSupply):

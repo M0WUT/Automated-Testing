@@ -1,7 +1,9 @@
-import logging
+# Standard imports
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.Oscilloscope.Oscilloscope import (
     Oscilloscope,
     OscilloscopeChannel,

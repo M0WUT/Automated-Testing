@@ -1,8 +1,10 @@
-import logging
+# Standard imports
 from enum import Enum, auto
 from typing import List, Tuple
 
-from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
+# Third party imports
+
+# Local imports
 from AutomatedTesting.Instruments.MultichannelInstrument import (
     InstrumentChannel,
     MultichannelInstrument,

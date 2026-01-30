@@ -1,5 +1,4 @@
 # Standard imports
-import math
 import logging
 
 # Third party imports

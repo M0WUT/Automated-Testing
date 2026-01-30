@@ -1,5 +1,4 @@
 # Standard imports
-import logging
 
 # Third party imports
 from pyvisa import ResourceManager

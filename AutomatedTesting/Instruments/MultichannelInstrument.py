@@ -43,7 +43,8 @@ class InstrumentChannel:
         assert self.reserved is False, "Requested channel is already reserved"
         self.reserved = True
         self.instrument.logger.info(
-            f"{self.instrument.name} - Channel {self.channel_num} reserved for {self.purpose}"
+            f"{self.instrument.name} - Channel {self.channel_num} "
+            f"reserved for {self.purpose}"
         )
         self.logger = logging.getLogger(self.purpose)
         self.logger.setLevel(self.logging_level)
@@ -110,7 +111,7 @@ class SourceChannel(InstrumentChannel):
                 except AttributeError:
                     pass
             self.instrument.disable_channel_output(self.channel_num)
-            self.logger.info(f"Output Disabled")
+            self.logger.info("Output Disabled")
 
         if self.instrument.verify:
             response = self.get_output_enabled_state()
