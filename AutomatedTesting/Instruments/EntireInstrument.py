@@ -1,5 +1,6 @@
 # Standard imports
 from logging import Logger
+import logging
 from typing import Optional
 
 # Third party imports
@@ -28,7 +29,7 @@ class EntireInstrument(BaseInstrument):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        logger: Logger,
+        logging_level: int,
         corrections: Optional[Corrections] = None,
         transducer: Optional[Transducer] = None,
         **kwargs,
@@ -39,11 +40,10 @@ class EntireInstrument(BaseInstrument):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             **kwargs,
         )
         self.reserved = False  # Whether this instrument is in use
-        self.name = self.name
         self.corrections = corrections
         self.transducer = transducer
 
@@ -54,14 +54,14 @@ class EntireInstrument(BaseInstrument):
         multiple roles
         """
         assert self.reserved is False, "Attempted to reserve a reserved device"
-        self.name = purpose
         self.reserved = True
-        self.logger.info(f"{self.name} reserved as {self.name}")
+        self.logger.info(f"{self.name} reserved for {purpose}")
+        self.logger = logging.getLogger(purpose)
 
     def free(self):
         assert self.reserved
-        self.logger.debug(f"{self.name} freed from role as {self.name}")
-        self.name = self.instrument_name
+        self.logger.info("Released")
+        self.logger = logging.getLogger(self.name)
         self.reserved = False
 
     def apply_corrections(self, corrections: Corrections) -> None:
@@ -69,3 +69,14 @@ class EntireInstrument(BaseInstrument):
 
     def apply_transducer(self, transducer: Transducer) -> None:
         self.transducer = transducer
+
+    #################################################
+    # Functions that must be implemented per device #
+    #################################################
+
+    # Inherited from BaseInstrument
+    def _set_remote_control(self) -> None:
+        raise NotImplementedError
+
+    def _set_local_control(self) -> None:
+        raise NotImplementedError

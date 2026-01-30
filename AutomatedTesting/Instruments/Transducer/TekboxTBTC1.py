@@ -7,8 +7,6 @@ from math import log10
 from AutomatedTesting.Instruments.Transducer.Transducer import Transducer
 from AutomatedTesting.Misc.Units import FieldStrengthUnits, AmplitudeUnits
 
-# from AutomatedTesting.Misc.UsefulFunctions import dbm_to_power, amplitude_to_db
-
 
 class TekboxTBTC1(Transducer):
     def __init__(self):

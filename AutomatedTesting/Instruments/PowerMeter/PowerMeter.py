@@ -20,7 +20,7 @@ class PowerMeter(EntireInstrument):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        logger: Logger,
+        logging_level: int,
         min_freq: float,
         max_freq: float,
         **kwargs,
@@ -31,7 +31,7 @@ class PowerMeter(EntireInstrument):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             **kwargs,
         )
         self.min_freq = min_freq

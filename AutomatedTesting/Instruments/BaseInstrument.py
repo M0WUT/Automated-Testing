@@ -4,6 +4,7 @@ import os
 import signal
 from threading import Lock, Thread, Event
 from time import sleep
+from typing import Optional
 
 # Third party imports
 from pyvisa import ResourceManager, VisaIOError
@@ -28,7 +29,6 @@ class BaseInstrument:
 
     Closing the connection is handled within the context manager's
     __exit__ function
-
     """
 
     def __init__(
@@ -37,8 +37,8 @@ class BaseInstrument:
         visa_address: str,
         name: str,
         expected_idn_response: str,
-        verify: bool,
-        logger: logging.Logger,
+        verify: bool = True,
+        logging_level: int = logging.INFO,
         only_software_control: bool = True,
         **kwargs,
     ):
@@ -47,53 +47,52 @@ class BaseInstrument:
         self.name = name
         self.expected_idn_response = expected_idn_response
         self.verify = verify
-        self.logger = logger
-        self.kwargs = kwargs
+        self.logging_level = logging_level
+        self.logger = logging.getLogger(self.name)
+        self.logger.setLevel(self.logging_level)
         self.only_software_control = only_software_control
-        self.error_process = None
-        self.terminate_error_process_flag = Event()
-        self.instrument_name = name
 
-        self.dev = None  # Connection to the device
+        self.kwargs = kwargs
+
+        self.monitor_process = None
+        self.terminate_monitor_process_flag = Event()
         self.lock = Lock()  # lock for access to the device connection
 
     def __enter__(self):
-        self.initialise()
-        return self
-
-    def initialise(self):
         """
         Opens connection to the instrument, checks the IDN response is correct
         and begins monitoring for errors
         """
         self.open_connection()
-        self.logger.info(f"Connected to {self.name}")
+        self.logger.info("Connected")
 
         # Reset the Device and start error monitoring thread only if only
-        #  under software control (as opposed to being used interactively)
+        # under software control (as opposed to being used interactively)
         if self.only_software_control:
             self.reset()
-            self.error_process = Thread(
+            self.clear_instrument_errors()
+            self.monitor_process = Thread(
                 target=self.check_instrument_errors, args=[os.getpid()], daemon=True
             )
-            self.error_process.start()
+            self.monitor_process.start()
 
-        self.logger.info(f"{self.name} initialised")
+        self.logger.info("Initialised")
+        return self
 
     def __exit__(self, *args, **kwargs):
-        self.cleanup()
+        self.shutdown()
 
-    def cleanup(self):
-        self.logger.info(f"Shutting down connection to {self.name}")
+    def shutdown(self) -> None:
+        self.logger.info("Shutting down connection")
         if self.only_software_control:
-            if self.error_process:
-                self.terminate_error_process_flag.set()
-                self.error_process.join()
+            if self.monitor_process:
+                self.terminate_monitor_process_flag.set()
+                self.monitor_process.join()
             self.set_local_control()
         if self.dev:
             self.dev.close()
             self.dev = None
-            self.logger.info(f"Connection to {self.name} closed")
+            self.logger.info("Connection closed")
 
     def open_connection(self):
         """
@@ -121,18 +120,25 @@ class BaseInstrument:
             f'Received response: "{idn_string}"'
         )
 
+    def reset(self):
+        self._write("*RST")
+        self.wait_until_op_complete()
+
+    def clear_instrument_errors(self):
+        self._write("*CLS")
+
     def set_remote_control(self):
         """
         Used if the instrument has any specific commands for remote control
         e.g. locking the front panel or blanking the display
         """
-        pass
+        self._set_remote_control()
 
     def set_local_control(self):
         """
         Returns the instrument back to local control
         """
-        pass
+        self._set_local_control()
 
     def check_instrument_errors(self, pid: int):
         """
@@ -140,36 +146,36 @@ class BaseInstrument:
         It queries the instrument then processes the results
         and decides whether to flag an issue to the main process
         """
-        self.logger.debug(f"Started error monitoring thread for {self.name}")
-        while not self.terminate_error_process_flag.is_set():
+        self.logger.debug("Started error monitoring thread")
+        while not self.terminate_monitor_process_flag.is_set():
             sleep(3)
             error_list = self.get_instrument_errors()
             if error_list:
                 for code, message in error_list:
-                    self.logger.error(
-                        f"{self.name} reporting error "
-                        f"{code} ({message}). Shutting down..."
-                    )
-
+                    self.logger.error(f"Error {code} ({message}). Shutting down...")
                 # Inform main thread
                 os.kill(pid, signal.SIGTERM)
 
     def get_instrument_errors(self) -> list[tuple[int, str]]:
         """
         Function to extract error messages from the device.
-        This can be overwritten by sub-classes if this uses different syntax
         """
         error_list = []
-        errors = self._query("SYST:ERR?")
+        errors = self._query("SYST:ERR:ALL?")
+
+        if errors == "":
+            return []
 
         for x in errors.split('",'):
             code, message = x.split(",")
-            message.replace('"', "")
             # Last item in list isn't comma terminated so need
             # to manually remove trailing speech marks
+            message.replace('"', "")
+
             code = int(code)
             if code:
                 error_list.append((code, message))
+
         return error_list
 
     def query_id(self) -> str:
@@ -177,17 +183,6 @@ class BaseInstrument:
         Queries the device's ID string and returns it
         """
         return self._query("*IDN?")
-
-    def reset(self):
-        """
-        Resets the device and clears all errors
-        """
-        self._write("*RST")
-        # Wait for reset to complete
-        sleep(1)
-        while self._query("*OPC?") == "0":
-            pass
-        self._write("*CLS")
 
     def _write(self, x: str, acquire_lock: bool = True):
         """
@@ -197,8 +192,6 @@ class BaseInstrument:
         acquire the lock itself (e.g. when used with query,
         the lock will have already been acquired)
         """
-        assert self.dev is not None
-
         if acquire_lock:
             self.lock.acquire()
             try:
@@ -207,9 +200,11 @@ class BaseInstrument:
                 self.lock.release()
         else:
             self.dev.write(x)  # type: ignore
-        self.logger.debug(f"[{self.instrument_name}] SENT:  {x}")
+        self.logger.debug(f"SENT: {x}")
 
-    def _read(self, acquire_lock: bool = True) -> str:
+    def _read(
+        self, acquire_lock: bool = True, timeout_s: Optional[float] = None
+    ) -> str:
         """
         Blocks until device is available, then reads a line
         from the device
@@ -220,49 +215,43 @@ class BaseInstrument:
         """
         if acquire_lock:
             self.lock.acquire()
-            try:
-                result = self.dev.read().strip()  # type: ignore
-            finally:
-                self.lock.release()
-        else:
-            result = self.dev.read().strip()  # type: ignore
 
-        self.logger.debug(f"[{self.instrument_name}] RCVD: {result}")
+        try:
+            old_timeout = self.dev.timeout
+            if timeout_s:
+                self.dev.timeout = timeout_s * 1000
+            result = self.dev.read().strip()  # type: ignore
+        finally:
+            self.dev.timeout = old_timeout
+            if acquire_lock:
+                self.lock.release()
+
+        self.logger.debug(f"RCVD: {result}")
         return result
 
-    def _query(self, command: str) -> str:
+    def _query(self, command: str, timeout_s: Optional[float] = None) -> str:
         """
         Writes "command" to the device and returns the response
         """
         self.lock.acquire()
         try:
             self._write(command, acquire_lock=False)
-            response = self._read(acquire_lock=False)
+            response = self._read(acquire_lock=False, timeout_s=timeout_s)
         finally:
             self.lock.release()
         return response
 
-    def wait_until_op_complete(self, timeout_s: int = 60):
+    def wait_until_op_complete(self, timeout_s: Optional[int] = None):
         """
         Blocks until current commmands have all been executed
         """
-        for x in range(timeout_s):
-            try:
-                self._query_with_increased_timeout("*OPC?", timeout_s * 1000)
-                return
-            except VisaIOError:
-                pass
-        raise RuntimeError
+        self._query("*OPC?", timeout_s)
 
-    def _query_with_increased_timeout(self, query: str, timeout_s: float):
-        old_timeout = self.dev.timeout  # type: ignore
-        try:
-            # There seems to be a bug with setting timeout to None (should be infinite)
-            # so set it to a week instead
-            self.dev.timeout = (
-                timeout_s * 1000 if timeout_s else (86400000)  # type: ignore
-            )
-            result = self._query(query)
-        finally:
-            self.dev.timeout = old_timeout  # type: ignore
-        return result
+    ################################################################
+    # Functions that must be implemented on a per-instrument basis #
+    ################################################################
+    def _set_remote_control(self) -> None:
+        raise NotImplementedError
+
+    def _set_local_control(self) -> None:
+        raise NotImplementedError

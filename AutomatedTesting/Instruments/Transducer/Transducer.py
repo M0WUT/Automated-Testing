@@ -5,7 +5,7 @@ from dataclasses import dataclass
 # Third party imports
 
 # Local imports
-from AutomatedTesting.Misc.Units import Units
+from AutomatedTesting.Misc.Units import MagnitudeUnits, AmplitudeUnits
 
 
 @dataclass
@@ -20,6 +20,6 @@ class Transducer:
     returns <value-in-input-units>
     """
 
-    input_units: Units
-    output_units: Units
+    input_units: MagnitudeUnits
+    output_units: AmplitudeUnits
     conversion_func_output_to_input: Callable[[float, float], float]

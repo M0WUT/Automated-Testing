@@ -1,12 +1,14 @@
+# Standard imports
 import logging
 import sys
 import time
 import signal
 
+# Third party imports
 from pyvisa import ResourceManager
-from pyvisa.constants import StopBits
+import coloredlogs
 
-
+# Local imports
 from AutomatedTesting.Instruments.DigitalMultimeter.Agilent_34401A import Agilent34401A
 from AutomatedTesting.Instruments.Oscilloscope.Keysight_MSOX2024A import (
     KeysightMSOX2024A,
@@ -27,15 +29,12 @@ from AutomatedTesting.Instruments.SpectrumAnalyser.Siglent_SSA3032XPlus import (
 
 resource_manager = ResourceManager("@py")
 
-logger = logging.getLogger("m0wut_automated_testing")
-logging_format = logging.Formatter("%(levelname)s: %(asctime)s %(message)s")
-logger.setLevel(logging.DEBUG)
 
-# Console Logging
-logging_handler = logging.StreamHandler()
-logging_handler.setLevel(logging.DEBUG)
-logging_handler.setFormatter(logging_format)
-logger.addHandler(logging_handler)
+coloredlogs.install(fmt="%(asctime)s %(name)s %(levelname)s %(message)s", level="DEBUG")
+
+silenced_loggers = ["matplotlib", "pyvisa"]
+for logger in silenced_loggers:
+    logging.getLogger(logger).setLevel(logging.CRITICAL)
 
 # File logging
 # loggingFileHandler = logging.FileHandler('warnings.log')
@@ -49,7 +48,7 @@ sdg2122x = SiglentSDG2122X(
     name="Siglent SDG2122X",
     expected_idn_response="Siglent Technologies,SDG2122X,SDG2XCAX5R0800,2.01.01.35R3B2",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
 )
 
 u2001a = AgilentU2001A(
@@ -58,7 +57,7 @@ u2001a = AgilentU2001A(
     name="Agilent U2001A",
     expected_idn_response="Agilent Technologies,U2001A,MY53150007,A1.03.05",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
 )
 
 e4433b = AgilentE4433B(
@@ -67,7 +66,7 @@ e4433b = AgilentE4433B(
     name="Agilent E4433B",
     expected_idn_response="Hewlett-Packard, ESG-D4000B, GB38320196, B.03.86",
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
     timeout=5000,
 )
 
@@ -77,35 +76,27 @@ dmm = Agilent34401A(
     name="Agilent 34401A",
     expected_idn_response="HEWLETT-PACKARD,34401A,0,10-5-2",
     verify=True,
-    logger=logger,
-    stop_bits=StopBits.two,
+    logging_level=logging.INFO,
+    read_termination="\n",
 )
 
-psu2 = Tenma722535(
+tenma_722940 = Tenma722940(
     resource_manager=resource_manager,
-    visa_address="ASRL/dev/serial/by-id/usb-Nuvoton_USB_Virtual_COM_A02014090305-if00::INSTR",  # noqa E501
-    name="Tenma 72-2535",
-    expected_idn_response="TENMA 72-2535 V2.1",
-    verify=True,
-    logger=logger,
-)
-
-psu3 = Tenma722940(
-    resource_manager=resource_manager,
-    visa_address="ASRL/dev/serial/by-id/usb-Nuvoton_USB_Virtual_COM_001461000452-if00::INSTR",  # noqa E501
+    visa_address="TCPIP::tenma.secure.shack.m0wut.com::23::SOCKET",  # noqa E501
     name="Tenma 72-2940",
     expected_idn_response="TENMA 72-2940 V5.7 SN:39846080",
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
+    read_termination="\n",
 )
 
-psu4 = SiglentSPD3303X(
+siglent_spd3303x = SiglentSPD3303X(
     resource_manager=resource_manager,
-    visa_address="TCPIP::10.59.73.57::INSTR",
+    visa_address="TCPIP::spd3303x.secure.shack.m0wut.com::INSTR",
     name="Siglent SPD3303X",
     expected_idn_response="Siglent Technologies,SPD3303X,SPD3XIEX6R2056,1.01.01.02.07R2,V3.0",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
 )
 
 ssa3032x = SiglentSSA3032XPlus(
@@ -114,7 +105,7 @@ ssa3032x = SiglentSSA3032XPlus(
     name="Siglent SSA3032X+",
     expected_idn_response="Siglent Technologies, ,XXXXXXXXXX,3.2.2.6.3R2.r2",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.DEBUG,
 )
 
 scope = KeysightMSOX2024A(
@@ -123,7 +114,7 @@ scope = KeysightMSOX2024A(
     name="Keysight MSOX2024A",
     expected_idn_response="AGILENT TECHNOLOGIES,MSO-X 2024A,MY56040858,02.41.2015102200",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
 )
 
 smb100a = RohdeAndSchwarzSMB100A(
@@ -132,13 +123,13 @@ smb100a = RohdeAndSchwarzSMB100A(
     name="R&S SMB100A",
     expected_idn_response="Rohde&Schwarz,SMB100A,1406.6000k03/180437,3.1.19.15-3.20.390.24",  # noqa E501
     verify=True,
-    logger=logger,
+    logging_level=logging.INFO,
 )
 
 
 # Attach handler to signal thrown by any error monitoring thread
 def panic(*args, **kwargs):
-    logger.error("Panicking, halting program")
+    logging.error("Panicking, halting program")
     sys.exit(1)
 
 

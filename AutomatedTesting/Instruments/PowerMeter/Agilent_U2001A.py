@@ -14,7 +14,7 @@ class AgilentU2001A(PowerMeter):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        logger: Logger,
+        logging_level: int,
         **kwargs,
     ):
         super().__init__(
@@ -23,7 +23,7 @@ class AgilentU2001A(PowerMeter):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             min_freq=10e6,
             max_freq=6e9,
             timeout=500,

@@ -9,9 +9,9 @@ from AutomatedTesting.Instruments.MultichannelInstrument import (
 class OscilloscopeChannel(InstrumentChannel):
     def __init__(
         self,
-        channel_number: int,
+        channel_num: int,
         instrument: MultichannelInstrument,
-        logger: logging.Logger,
+        logging_level: int,
         max_voltage: float,
         max_frequency: float,
         allowed_volts_per_div: list[float],
@@ -20,17 +20,16 @@ class OscilloscopeChannel(InstrumentChannel):
         self.max_frequency = max_frequency
         self.allowed_volts_per_div = allowed_volts_per_div
         super().__init__(
-            channel_number=channel_number, instrument=instrument, logger=logger
+            channel_num=channel_num, instrument=instrument, logging_level=logging_level
         )
 
-    def _reserve(self, purpose: str):
-        super()._reserve(purpose)
+    def __enter__(self, purpose: str):
+        super().__enter__(purpose)
         self.enable_display()
-        return self
 
-    def free(self):
+    def __exit__(self, *args, **kwargs):
         self.disable_display()
-        super().free()
+        super().__exit__(args, kwargs)
 
     def set_output_enabled_state(self, enabled: bool):
         """
@@ -41,7 +40,7 @@ class OscilloscopeChannel(InstrumentChannel):
 
     def set_input_coupling(self, dc_coupling: bool = False):
         self.instrument.set_channel_input_coupling(
-            channel_number=self.channel_number, dc_coupling=dc_coupling
+            channel_num=self.channel_num, dc_coupling=dc_coupling
         )
         if self.instrument.verify:
             assert self.get_input_coupling() == dc_coupling
@@ -51,7 +50,7 @@ class OscilloscopeChannel(InstrumentChannel):
         Returns True if the input is dc_coupled
         """
         dc_coupled = self.instrument.get_channel_input_coupling(
-            channel_number=self.channel_number
+            channel_num=self.channel_num
         )
         return dc_coupled
 
@@ -65,7 +64,7 @@ class OscilloscopeChannel(InstrumentChannel):
         """
         En/disables the channel on the oscilloscope
         """
-        self.instrument.set_channel_display_enabled_state(self.channel_number, enabled)
+        self.instrument.set_channel_display_enabled_state(self.channel_num, enabled)
         if self.instrument.verify:
             assert self.get_display_enabled_state() == enabled
 
@@ -73,7 +72,7 @@ class OscilloscopeChannel(InstrumentChannel):
         """
         Returns True if the channel display is enabled
         """
-        return self.instrument.get_channel_display_enabled_state(self.channel_number)
+        return self.instrument.get_channel_display_enabled_state(self.channel_num)
 
     def enable_display(self):
         self.set_display_enabled_state(True)
@@ -85,13 +84,13 @@ class OscilloscopeChannel(InstrumentChannel):
         """
         Measures RMS voltage in Volts
         """
-        return self.instrument.measure_channel_rms_voltage(self.channel_number)
+        return self.instrument.measure_channel_rms_voltage(self.channel_num)
 
     def set_voltage_range(self, voltage_range: float):
         """
         Sets maximum range in Volts
         """
-        self.instrument.set_channel_voltage_range(self.channel_number, voltage_range)
+        self.instrument.set_channel_voltage_range(self.channel_num, voltage_range)
         if self.instrument.verify:
             assert self.get_voltage_range() == voltage_range
 
@@ -99,13 +98,13 @@ class OscilloscopeChannel(InstrumentChannel):
         """
         Returns full scale range in Volts
         """
-        return float(self.instrument.get_channel_voltage_range(self.channel_number))
+        return float(self.instrument.get_channel_voltage_range(self.channel_num))
 
     def set_voltage_scale(self, volts_per_div: float):
         """
         Sets Volts per division
         """
-        self.instrument.set_channel_voltage_scale(self.channel_number, volts_per_div)
+        self.instrument.set_channel_voltage_scale(self.channel_num, volts_per_div)
         if self.instrument.verify:
             assert self.get_voltage_scale() == volts_per_div
 
@@ -113,7 +112,7 @@ class OscilloscopeChannel(InstrumentChannel):
         """
         Returns Volts per division
         """
-        return float(self.instrument.get_channel_voltage_scale(self.channel_number))
+        return float(self.instrument.get_channel_voltage_scale(self.channel_num))
 
 
 class Oscilloscope(MultichannelInstrument):
@@ -126,25 +125,25 @@ class Oscilloscope(MultichannelInstrument):
                 x.disable_display()
                 x.set_input_coupling_ac()
 
-    def set_channel_input_coupling(self, channel_number: int, dc_coupling: bool):
+    def set_channel_input_coupling(self, channel_num: int, dc_coupling: bool):
         raise NotImplementedError
 
-    def get_channel_input_coupling(self, channel_number: int) -> bool:
+    def get_channel_input_coupling(self, channel_num: int) -> bool:
         """
         Returns True if channel is DC coupled
         """
         raise NotImplementedError
 
-    def set_channel_display_enabled_state(self, channel_number: int, enabled: bool):
+    def set_channel_display_enabled_state(self, channel_num: int, enabled: bool):
         raise NotImplementedError
 
-    def get_channel_display_enabled_state(self, channel_number: int) -> bool:
+    def get_channel_display_enabled_state(self, channel_num: int) -> bool:
         """
         Returns True if the channel is enabled
         """
         raise NotImplementedError
 
-    def measure_channel_rms_voltage(self, channel_number: int) -> float:
+    def measure_channel_rms_voltage(self, channel_num: int) -> float:
         raise NotImplementedError
 
     def set_timebase_scale(self, seconds_per_div: float):
@@ -156,13 +155,13 @@ class Oscilloscope(MultichannelInstrument):
         """
         raise NotImplementedError
 
-    def set_channel_voltage_range(self, channel_number: int, voltage_range: float):
+    def set_channel_voltage_range(self, channel_num: int, voltage_range: float):
         """
         Sets channel full scale range in Volts
         """
         raise NotImplementedError
 
-    def get_channel_voltage_range(self, channel_number: int) -> float:
+    def get_channel_voltage_range(self, channel_num: int) -> float:
         """
         Returns channel full scale range in Volts
         """

@@ -16,4 +16,5 @@ dependencies=[
     "GitPython",
     "pep8-naming",
     "flake8",
+    "coloredlogs",
 ]

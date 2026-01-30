@@ -25,7 +25,11 @@ class Units(StrEnum):
         raise NotImplementedError
 
 
-class AmplitudeUnits(Units):
+class MagnitudeUnits(Units):
+    pass
+
+
+class AmplitudeUnits(MagnitudeUnits):
 
     DBM = "dBm"
     DBMV = "dBmV"
@@ -43,7 +47,7 @@ class AmplitudeUnits(Units):
         return f"Amplitude ({self.value})"
 
 
-class FieldStrengthUnits(Units):
+class FieldStrengthUnits(MagnitudeUnits):
     DBUV_PER_M = "dBµV/m"
     DBUA_PER_M = "dBµA/m"
 

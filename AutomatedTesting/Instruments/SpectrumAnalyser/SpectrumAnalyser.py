@@ -1,7 +1,7 @@
 # Standard imports
 from enum import Enum, auto
 from logging import Logger
-from typing import Optional, Union
+from typing import Optional
 from math import ceil, floor
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,7 +15,10 @@ from pyvisa import ResourceManager
 # Local imports
 from AutomatedTesting.Instruments.EntireInstrument import EntireInstrument
 from AutomatedTesting.Instruments.Transducer.Transducer import Transducer
-from AutomatedTesting.Misc.Units import AmplitudeUnits, FieldStrengthUnits
+from AutomatedTesting.Misc.Units import (
+    AmplitudeUnits,
+    MagnitudeUnits,
+)
 
 
 class SpectrumAnalyser(EntireInstrument):
@@ -44,7 +47,7 @@ class SpectrumAnalyser(EntireInstrument):
     @dataclass
     class SpectrumAnalyserMeasurement:
         datapoints: dict["SpectrumAnalyser.DetectorType", list[tuple[float, float]]]
-        units: Union[AmplitudeUnits, FieldStrengthUnits]
+        units: MagnitudeUnits
 
         def __add__(
             self, other: "SpectrumAnalyser.SpectrumAnalyserMeasurement"
@@ -132,7 +135,7 @@ class SpectrumAnalyser(EntireInstrument):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        logger: Logger,
+        logging_level: int,
         min_freq: int,
         max_freq: int,
         min_num_sweep_points: int,
@@ -162,7 +165,7 @@ class SpectrumAnalyser(EntireInstrument):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             **kwargs,
         )
         if (
@@ -192,142 +195,6 @@ class SpectrumAnalyser(EntireInstrument):
         if self.supports_emi_measurements:
             assert supported_emi_rbw is not None
         self.supported_emi_rbw = supported_emi_rbw
-
-    # Functions that must be specified by the individual class
-    # All input validation should happen in the SpectrumAnalyser base class
-    # so these functions should purely implement the transaction
-    def _set_start_freq(self, freq_hz: float):
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_start_freq(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_stop_freq(self, freq_hz: float):
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_stop_freq(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_centre_freq(self, freq_hz: float):
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_centre_freq(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_span(self, span_hz: float):
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_span(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_zero_span_enabled_state(self, enabled: bool) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_zero_span_enabled_state(self) -> bool:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_filter_type(self, filter_type: FilterType) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_filter_type(self) -> FilterType:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_rbw(self, rbw_hz: float) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_rbw(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_vbw(self, vbw_hz: float) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_vbw(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_sweep_mode(self, mode: SweepMode) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_sweep_mode(self) -> SweepMode:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_num_sweep_points(self, num_points: int) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_num_sweep_points(self) -> int:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_input_attenuation(self, attenuation_db: float) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_input_attenuation(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_ref_level(self, ref_level) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_ref_level(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _trigger_sweep(self) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_trace_data(self, trace_num: int) -> list[float]:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_marker_enabled_state(self, marker_num: int, enabled_bool) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_marker_enabled_state(self, marker_num: int) -> bool:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_marker_freq(
-        self,
-        marker_num: int,
-        freq_hz: float,
-    ) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_marker_freq(self, marker_num: int) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _measure_marker_power(self, marker_num: int) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_trace_mode(self, trace_num: int, mode: TraceMode) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_trace_mode(self, trace_num: int) -> TraceMode:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_detector_type(self, trace_num: int, detector_type: DetectorType) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_detector_type(self, trace_num: int) -> DetectorType:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_y_axis_units(self, units: AmplitudeUnits) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_y_axis_units(self) -> AmplitudeUnits:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_preamp_enabled_state(self, enabled: bool):
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_preamp_enabled_state(self) -> bool:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_sweep_time(self, sweep_time_s: float) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_sweep_time(self) -> float:
-        raise NotImplementedError  # pragma: no cover
-
-    def _set_sweep_time_auto_enabled_state(self, enabled: bool) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def _get_sweep_time_auto_enabled_state(self) -> bool:
-        raise NotImplementedError  # pragma: no cover
 
     ################################################################
     # Wrappers for functions that are for all devices
@@ -1072,7 +939,7 @@ class SpectrumAnalyser(EntireInstrument):
         detector_types: Optional[list[DetectorType]] = None,
         seconds_per_mhz: Optional[float] = None,
         num_sweeps: int = 1,
-        units: AmplitudeUnits | FieldStrengthUnits = AmplitudeUnits.DBM,
+        units: MagnitudeUnits = AmplitudeUnits.DBM,
     ) -> SpectrumAnalyserMeasurement:
         """
         Some sweeps may require > 1 sweep to capture at sufficient resolution
@@ -1095,9 +962,10 @@ class SpectrumAnalyser(EntireInstrument):
         """
         if self.transducer:
             assert units == self.transducer.input_units
-        self.set_y_axis_units(
-            self.transducer.output_units if self.transducer else units
-        )
+            self.set_y_axis_units(self.transducer.output_units)
+        else:
+            assert isinstance(units, AmplitudeUnits)
+            self.set_y_axis_units(units)
 
         results = SpectrumAnalyser.SpectrumAnalyserMeasurement(
             datapoints={}, units=units
@@ -1150,7 +1018,7 @@ class SpectrumAnalyser(EntireInstrument):
                 self.trigger_sweep(num_sweeps)
 
                 # Add datapoints to results
-                for trace_index, detector_type in enumerate(detector_types):
+                for trace_index in range(len(detector_types)):
                     results += self.get_trace_data(trace_index + 1)
 
                 # Update counters
@@ -1370,3 +1238,148 @@ class SpectrumAnalyser(EntireInstrument):
     def apply_transducer(self, transducer: Transducer) -> None:
         super().apply_transducer(transducer)
         self.set_y_axis_units(transducer.output_units)
+
+    #################################################
+    # Functions that must be implemented per device #
+    #################################################
+
+    # Inherited from BaseInstrument
+    def _set_remote_control(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_local_control(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    # Specific to this class
+    def _set_start_freq(self, freq_hz: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_start_freq(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_stop_freq(self, freq_hz: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_stop_freq(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_centre_freq(self, freq_hz: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_centre_freq(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_span(self, span_hz: float):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_span(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_zero_span_enabled_state(self, enabled: bool) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_zero_span_enabled_state(self) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_filter_type(self, filter_type: FilterType) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_filter_type(self) -> FilterType:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_rbw(self, rbw_hz: float) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_rbw(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_vbw(self, vbw_hz: float) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_vbw(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_sweep_mode(self, mode: SweepMode) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_sweep_mode(self) -> SweepMode:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_num_sweep_points(self, num_points: int) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_num_sweep_points(self) -> int:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_input_attenuation(self, attenuation_db: float) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_input_attenuation(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_ref_level(self, ref_level) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_ref_level(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _trigger_sweep(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_trace_data(self, trace_num: int) -> list[float]:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_marker_enabled_state(self, marker_num: int, enabled_bool) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_marker_enabled_state(self, marker_num: int) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_marker_freq(
+        self,
+        marker_num: int,
+        freq_hz: float,
+    ) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_marker_freq(self, marker_num: int) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _measure_marker_power(self, marker_num: int) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_trace_mode(self, trace_num: int, mode: TraceMode) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_trace_mode(self, trace_num: int) -> TraceMode:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_detector_type(self, trace_num: int, detector_type: DetectorType) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_detector_type(self, trace_num: int) -> DetectorType:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_y_axis_units(self, units: AmplitudeUnits) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_y_axis_units(self) -> AmplitudeUnits:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_preamp_enabled_state(self, enabled: bool):
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_preamp_enabled_state(self) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_sweep_time(self, sweep_time_s: float) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_sweep_time(self) -> float:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_sweep_time_auto_enabled_state(self, enabled: bool) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def _get_sweep_time_auto_enabled_state(self) -> bool:
+        raise NotImplementedError  # pragma: no cover

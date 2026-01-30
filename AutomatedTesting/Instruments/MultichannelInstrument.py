@@ -1,113 +1,144 @@
+# Standard imports
 import logging
 import os
 import signal
-from multiprocessing import Process
+from threading import Event, Thread
 from time import sleep
+from typing import Optional, Sequence
 
+# Third party imports
 from pyvisa import ResourceManager
 
+# Local imports
 from AutomatedTesting.Instruments.BaseInstrument import BaseInstrument
 
 
 class InstrumentChannel:
     def __init__(
         self,
-        channel_number: int,
-        # Can't type hint as creates a circular reference
-        instrument,  # : MultichannelInstrument,
-        logger: logging.Logger,
+        channel_num: int,
+        instrument: "MultichannelInstrument",
+        logging_level: int,
     ):
         """
         Channel Number is 1-indexed because I'm human
         """
-        # Channel objects get created before the instrument
-        # they're assigned to so have to set as None and override later
         self.instrument = instrument
-        self.name = None
-        self.channel_number = channel_number
-        self.logger = logger
+        self.channel_num = channel_num
+        self.logger: Optional[logging.Logger] = None
+        self.logging_level = logging_level
+        self.logger = logging.getLogger(
+            f"{self.instrument.name} - Channel {self.channel_num}"
+        )
+        self.logger.setLevel(self.logging_level)
 
-        self.reserved = False
-
-        self.name = None
-        self.monitor_process = Process(
+        self.reserved: bool = False
+        self.purpose: Optional[str] = None
+        self.monitor_process = Thread(
             target=self.check_channel_errors, args=[os.getpid()], daemon=True
         )
+        self.terminate_monitor_process_flag = Event()
 
-    def _reserve(self, purpose: str):
-        assert (
-            self.reserved is False
-        ), f"Requested channel is already reserved for {self.name}"
-        old_name = self.name
-        self.name = purpose
+    def __enter__(self):
+        assert self.reserved is False, "Requested channel is already reserved"
         self.reserved = True
-        self.logger.debug(f"{old_name} assigned to {self.name}")
+        self.instrument.logger.info(
+            f"{self.instrument.name} - Channel {self.channel_num} reserved for {self.purpose}"
+        )
+        self.logger = logging.getLogger(self.purpose)
+        self.logger.setLevel(self.logging_level)
         return self
 
-    def free(self):
-        assert self.reserved, "Attempeted to free an already free channel"
+    def __exit__(self, *args, **kwargs):
+        self.shutdown()
+        assert self.reserved, "Attempted to free an already free channel"
         if self.monitor_process.is_alive():
-            self.monitor_process.terminate()
+            self.terminate_monitor_process_flag.set()
             self.monitor_process.join(2)
-        old_name = self.name
-        self.name = f"{self.instrument.name} - Channel {self.channel_number}"
+
         self.reserved = False
-        self.logger.debug(f"{self.name} released from role as {old_name}")
+        self.logger.info("Released")
+        self.logger = logging.getLogger(
+            f"{self.instrument.name} - Channel {self.channel_num}"
+        )
+        self.logger.setLevel(self.logging_level)
 
     def check_channel_errors(self, pid: int):
         """
         Checks for channel specific errors, raises a signal to thread with Process
         ID pid in case of an error
         """
-        self.logger.debug(f"Started error monitoring thread for {self.name}")
-        while True:
+        self.logger.debug("Started error monitoring thread")
+        while not self.terminate_monitor_process_flag.is_set():
             sleep(3)
-            error_list = self.instrument.get_channel_errors(self.channel_number)
+            error_list = self.instrument.get_channel_errors(self.channel_num)
             if error_list:
                 for error_code, error_message in error_list:
                     self.logger.error(
-                        f"{self.name} reporting error "
-                        f"{error_code} ({error_message}). Shutting down..."
+                        f"Error {error_code} ({error_message}). Shutting down..."
                     )
-
                 # Inform main thread
                 os.kill(pid, signal.SIGTERM)
 
-    def set_output_enabled_state(self, enabled: bool = True):
+    def shutdown(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+
+class SourceChannel(InstrumentChannel):
+
+    # def __exit__(self, *args, **kwargs):
+    #     self.disable_output()
+    #     super().__exit__(args, kwargs)
+
+    def set_output_enabled_state(self, enabled: bool = True) -> None:
         if enabled:
             assert self.monitor_process.is_alive() is False and self.reserved
-            self.instrument.enable_channel_output(self.channel_number)
+            self.instrument.enable_channel_output(self.channel_num)
             sleep(0.5)  # Allow a small amount of time for inrush current
-            self.monitor_process = Process(
-                target=self.check_channel_errors, args=[os.getpid()], daemon=True
+            self.monitor_process = Thread(
+                target=self.check_channel_errors,
+                args=[os.getpid()],
+                daemon=True,
             )
             self.monitor_process.start()
-            self.logger.debug(f"{self.name} - Output Enabled")
+            self.logger.info("Output Enabled")
         else:
             if self.monitor_process and self.monitor_process.is_alive():
                 try:
-                    self.monitor_process.terminate()
+                    self.terminate_monitor_process_flag.set()
                     self.monitor_process.join()
                 except AttributeError:
                     pass
-            self.instrument.disable_channel_output(self.channel_number)
-            self.logger.debug(f"{self.name} - Output Disabled")
+            self.instrument.disable_channel_output(self.channel_num)
+            self.logger.info(f"Output Disabled")
 
         if self.instrument.verify:
             response = self.get_output_enabled_state()
             assert response == enabled
 
     def get_output_enabled_state(self) -> bool:
-        return self.instrument.get_channel_output_enabled_state(self.channel_number)
+        return self.instrument.get_channel_output_enabled_state(self.channel_num)
 
-    def enable_output(self):
+    def enable_output(self) -> None:
         self.set_output_enabled_state(True)
 
-    def disable_output(self):
+    def disable_output(self) -> None:
         self.set_output_enabled_state(False)
 
-    def cleanup(self):
+    def shutdown(self) -> None:
         self.disable_output()
+
+
+class MeasureChannel(InstrumentChannel):
+    def __enter__(self):
+        self.monitor_process = Thread(
+            target=self.check_channel_errors, args=[os.getpid()], daemon=True
+        )
+        self.monitor_process.start()
+        return self
+
+    def shutdown(self) -> None:
+        pass
 
 
 class MultichannelInstrument(BaseInstrument):
@@ -125,8 +156,8 @@ class MultichannelInstrument(BaseInstrument):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        channels: list[InstrumentChannel],
-        logger: logging.Logger,
+        logging_level: int,
+        channels: Sequence[InstrumentChannel],
         **kwargs,
     ):
         super().__init__(
@@ -135,43 +166,77 @@ class MultichannelInstrument(BaseInstrument):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             **kwargs,
         )
-        self.channel_count = len(channels)
-        expected_channels = list(range(1, self.channel_count + 1))
-        found_channels = [x.channel_number for x in channels]
-        assert expected_channels == found_channels
+        # Keep it as a list as, in rare cases,
+        # this might not be continuous
         self.channels = channels
 
     def __enter__(self):
-        self.initialise()
-
-    def initialise(self):
-        super().initialise()
+        super().__enter__()
         for x in self.channels:
             x.instrument = self
-            x.name = f"{self.name} - Channel {x.channel_number}"
-            if self.only_software_control:
+            if self.only_software_control and isinstance(x, SourceChannel):
                 x.disable_output()
         return self
 
     def __exit__(self, *args, **kwargs):
-        self.cleanup()
+        self.shutdown()
 
-    def cleanup(self):
+    def shutdown(self) -> None:
         if self.only_software_control:
             for x in self.channels:
-                x.cleanup()
-        super().cleanup()
+                x.shutdown()
+        super().shutdown()
 
-    def validate_channel_number(self, channel_number: int):
-        if not 1 <= channel_number <= self.channel_count:
+    def validate_channel_num(self, channel_num: int) -> None:
+        if channel_num not in [x.channel_num for x in self.channels]:
             raise ValueError(
-                f"Invalid channel number {channel_number} requested for {self.name}"
+                f"Invalid channel number {channel_num} requested for {self.name}"
             )
 
-    def reserve_channel(self, channel_number: int, purpose: str) -> InstrumentChannel:
-        self.validate_channel_number(channel_number)
-        self.channels[channel_number - 1]._reserve(purpose)
-        return self.channels[channel_number - 1]
+    def get_channel(self, channel_num: int) -> InstrumentChannel:
+        self.validate_channel_num(channel_num)
+        for channel in self.channels:
+            if channel.channel_num == channel_num:
+                return channel
+        raise ValueError(f"Could not find channel {channel_num} in {self.name}")
+
+    def reserve_channel(self, channel_num: int, purpose: str) -> InstrumentChannel:
+        self.validate_channel_num(channel_num)
+        for channel in self.channels:
+            if channel.channel_num == channel_num:
+                channel.purpose = purpose
+                return channel
+        raise ValueError(f"Could not find channel {channel_num} in {self.name}")
+
+    def get_channel_errors(self, channel_num: int) -> list[tuple[int, str]]:
+        return self._get_channel_errors(channel_num)
+
+    def enable_channel_output(self, channel_num: int) -> None:
+        self.set_channel_output_enabled_state(channel_num, True)
+
+    def disable_channel_output(self, channel_num: int) -> None:
+        self.set_channel_output_enabled_state(channel_num, False)
+
+    #################################################
+    # Functions that must be implemented per device #
+    #################################################
+
+    # Inherited from BaseInstrument
+    def _set_remote_control(self) -> None:
+        raise NotImplementedError
+
+    def _set_local_control(self) -> None:
+        raise NotImplementedError
+
+    # Specific to this class
+    def _get_channel_errors(self, channel_num: int) -> list[tuple[int, str]]:
+        raise NotImplementedError
+
+    def set_channel_output_enabled_state(self, channel_num: int, enabled: bool) -> None:
+        raise NotImplementedError
+
+    def get_channel_output_enabled_state(self, channel_num: int) -> bool:
+        raise NotImplementedError

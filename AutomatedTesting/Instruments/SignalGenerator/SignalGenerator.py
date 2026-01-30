@@ -20,15 +20,15 @@ class SignalGeneratorModulation(Enum):
 class SignalGeneratorChannel(InstrumentChannel):
     def __init__(
         self,
-        channel_number: int,
-        instrument: BaseInstrument,
-        logger: logging.Logger,
+        channel_num: int,
+        instrument: MultichannelInstrument,
+        logging_level: int,
         max_power: float,  # in dBm
         min_power: float,
         max_freq: float,  # in Hz
         min_freq: float,
     ):
-        super().__init__(channel_number, instrument, logger)
+        super().__init__(channel_num, instrument, logging_level)
 
         # Save channel limits for power - Two limits as we
         # can set soft limits later
@@ -120,7 +120,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         assert self.get_load_impedance() == 50
         if (power < self.min_power) or (power > self.max_power):
             raise ValueError(f"Unable to set {self.name} to {power}dBm")
-        self.instrument.set_channel_power(self.channel_number, power)
+        self.instrument.set_channel_power(self.channel_num, power)
         if self.instrument.verify:
             assert self.get_power() == power
         self.logger.debug(f"{self.name} set to {power} dBm")
@@ -137,7 +137,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             None
         """
         assert self.get_load_impedance() == 50
-        return self.instrument.get_channel_power(self.channel_number)
+        return self.instrument.get_channel_power(self.channel_num)
 
     def set_freq(self, freq):
         """
@@ -153,7 +153,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             AssertionError: If verified frequency != requested frequency
         """
         if self.min_freq <= freq <= self.max_freq:
-            self.instrument.set_channel_freq(self.channel_number, freq)
+            self.instrument.set_channel_freq(self.channel_num, freq)
             if self.instrument.verify:
                 assert self.get_freq() == freq
             self.logger.debug(f"{self.name} set to {readable_freq(freq)}")
@@ -169,7 +169,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             None
         """
-        return self.instrument.get_channel_freq(self.channel_number)
+        return self.instrument.get_channel_freq(self.channel_num)
 
     def set_modulation(self, modulation: SignalGeneratorModulation):
         """
@@ -182,7 +182,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             AssertionError: If verified modulation != requested modulation
         """
-        self.instrument.set_channel_modulation(self.channel_number, modulation)
+        self.instrument.set_channel_modulation(self.channel_num, modulation)
         if self.instrument.verify:
             assert self.get_modulation() == modulation
         self.logger.debug(f"{self.name} set modulation type to {modulation}")
@@ -198,7 +198,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             None
         """
-        return self.instrument.get_channel_modulation(self.channel_number)
+        return self.instrument.get_channel_modulation(self.channel_num)
 
     def set_load_impedance(self, impedance: float):
         """
@@ -212,7 +212,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             AssertionError: If verified impedance != requested impedance
         """
-        self.instrument.set_channel_load_impedance(self.channel_number, impedance)
+        self.instrument.set_channel_load_impedance(self.channel_num, impedance)
         if self.instrument.verify:
             assert self.get_load_impedance() == impedance
 
@@ -227,7 +227,7 @@ class SignalGeneratorChannel(InstrumentChannel):
         Raises:
             None
         """
-        return self.instrument.get_channel_load_impedance(self.channel_number)
+        return self.instrument.get_channel_load_impedance(self.channel_num)
 
     def set_vpp(self, voltage: float):
         """
@@ -241,7 +241,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             AssertionError: If verified voltage != requested voltage
         """
         assert self.get_load_impedance() == float("inf")
-        self.instrument.set_channel_vpp(self.channel_number, voltage)
+        self.instrument.set_channel_vpp(self.channel_num, voltage)
         if self.instrument.verify:
             assert self.get_vpp() == voltage
 
@@ -257,7 +257,7 @@ class SignalGeneratorChannel(InstrumentChannel):
             None
         """
         assert self.get_load_impedance() == float("inf")
-        return self.instrument.get_channel_vpp(self.channel_number)
+        return self.instrument.get_channel_vpp(self.channel_num)
 
 
 class SignalGenerator(MultichannelInstrument):
@@ -279,51 +279,49 @@ class SignalGenerator(MultichannelInstrument):
                 x.set_power(x.min_power)
         return self
 
-    def reserve_channel(
-        self, channel_number: int, purpose: str
-    ) -> SignalGeneratorChannel:
-        return super().reserve_channel(channel_number, purpose)
+    def reserve_channel(self, channel_num: int, purpose: str) -> SignalGeneratorChannel:
+        return super().reserve_channel(channel_num, purpose)
 
     def get_instrument_errors(self) -> List[Tuple[int, str]]:
         return super().get_instrument_errors()
 
-    def get_channel_errors(self, channel_number: int) -> list[Tuple[int, str]]:
+    def get_channel_errors(self, channel_num: int) -> list[Tuple[int, str]]:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_output_enabled_state(self, channel_number: int, enabled: bool):
+    def set_channel_output_enabled_state(self, channel_num: int, enabled: bool):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_output_enabled_state(self, channel_number: int) -> bool:
+    def get_channel_output_enabled_state(self, channel_num: int) -> bool:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_power(self, channel_number: int, power: float):
+    def set_channel_power(self, channel_num: int, power: float):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_power(self, channel_number: int) -> float:
+    def get_channel_power(self, channel_num: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_frequency(self, channel_number: int, freq: float):
+    def set_channel_frequency(self, channel_num: int, freq: float):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_freq(self, channel_number: int) -> float:
+    def get_channel_freq(self, channel_num: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
     def set_channel_modulation(
-        self, channel_number: int, modulation: SignalGeneratorModulation
+        self, channel_num: int, modulation: SignalGeneratorModulation
     ):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_modulation(self, channel_number: int) -> SignalGeneratorModulation:
+    def get_channel_modulation(self, channel_num: int) -> SignalGeneratorModulation:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_load_impedance(self, channel_number: int, impedance: float):
+    def set_channel_load_impedance(self, channel_num: int, impedance: float):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_load_impedance(self, channel_number: int) -> float:
+    def get_channel_load_impedance(self, channel_num: int) -> float:
         raise NotImplementedError  # pragma: no cover
 
-    def set_channel_vpp(self, channel_number: int, voltage: float):
+    def set_channel_vpp(self, channel_num: int, voltage: float):
         raise NotImplementedError  # pragma: no cover
 
-    def get_channel_vpp(self, channel_number) -> float:
+    def get_channel_vpp(self, channel_num) -> float:
         raise NotImplementedError  # pragma: no cover

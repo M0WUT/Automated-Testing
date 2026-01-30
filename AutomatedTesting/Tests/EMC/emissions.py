@@ -1,6 +1,6 @@
 # Standard imports
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional
 from enum import StrEnum
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from matplotlib.axes import Axes
 from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
     SpectrumAnalyser,
 )
-from AutomatedTesting.Misc.Units import AmplitudeUnits, FieldStrengthUnits
+from AutomatedTesting.Misc.Units import AmplitudeUnits
 
 
 class EmissionsType(StrEnum):
@@ -51,7 +51,7 @@ class EmissionsMeasurementRange:
     def measure(
         self,
         sa: SpectrumAnalyser,
-        units: AmplitudeUnits | FieldStrengthUnits = AmplitudeUnits.DBM,
+        units: AmplitudeUnits = AmplitudeUnits.DBM,
     ):
         return sa.perform_multi_part_sweep(
             self.start_freq,
@@ -124,9 +124,8 @@ class EmissionsMeasurement:
     name: str
     measurements: list[EmissionsMeasurementRange]
     limits: Optional[list[EmissionsLimitLine]] = None
-    units: Union[AmplitudeUnits, FieldStrengthUnits] = (
-        AmplitudeUnits.DBM
-    )  # Units to be used for plotting / limits
+    units: AmplitudeUnits = AmplitudeUnits.DBM
+    # Units to be used for plotting / limits
 
     def measure(
         self,

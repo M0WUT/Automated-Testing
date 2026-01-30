@@ -1,5 +1,7 @@
 # Standard imports
+import logging
 import math
+import time
 
 # Third party imports
 import pytest
@@ -11,7 +13,7 @@ from AutomatedTesting.Instruments.SpectrumAnalyser.SpectrumAnalyser import (
 )
 from AutomatedTesting.Instruments.Transducer.TekboxTBTC1 import TekboxTBTC1
 from AutomatedTesting.Misc.Corrections import Corrections
-from AutomatedTesting.Misc.Units import AmplitudeUnits
+from AutomatedTesting.Misc.Units import FieldStrengthUnits, AmplitudeUnits
 
 
 pytestmark = pytest.mark.parametrize("spectrum_analyser", [ssa3032x])
@@ -19,6 +21,7 @@ pytestmark = pytest.mark.parametrize("spectrum_analyser", [ssa3032x])
 
 @pytest.fixture(scope="function")
 def sa(spectrum_analyser):
+    time.sleep(1)
     with spectrum_analyser:
         yield spectrum_analyser
 
@@ -32,7 +35,7 @@ def test_parameter_validation(spectrum_analyser):
             name=None,  # type: ignore
             expected_idn_response=None,  # type: ignore
             verify=None,  # type: ignore
-            logger=None,  # type: ignore
+            logging_level=logging.WARNING,
             min_freq=int(2e9),
             max_freq=int(1e9),
             min_num_sweep_points=10,
@@ -58,7 +61,7 @@ def test_parameter_validation(spectrum_analyser):
             name=None,  # type: ignore
             expected_idn_response=None,  # type: ignore
             verify=None,  # type: ignore
-            logger=None,  # type: ignore
+            logging_level=logging.WARNING,
             min_freq=int(1e9),
             max_freq=int(2e9),
             min_num_sweep_points=11,
@@ -85,7 +88,7 @@ def test_parameter_validation(spectrum_analyser):
             name=None,  # type: ignore
             expected_idn_response=None,  # type: ignore
             verify=None,  # type: ignore
-            logger=None,  # type: ignore
+            logging_level=logging.WARNING,
             min_freq=int(1e9),
             max_freq=int(2e9),
             min_num_sweep_points=10,
@@ -164,7 +167,7 @@ def test_rbw(sa: SpectrumAnalyser):
         name=None,  # type: ignore
         expected_idn_response=None,  # type: ignore
         verify=None,  # type: ignore
-        logger=None,  # type: ignore
+        logging_level=logging.WARNING,
         min_freq=int(1e9),
         max_freq=int(2e9),
         min_num_sweep_points=10,
@@ -297,6 +300,41 @@ def test_multipart_sweep(sa: SpectrumAnalyser):
         )
 
 
+def test_multipart_sweep_transducer(sa: SpectrumAnalyser):
+    sa.apply_transducer(TekboxTBTC1())
+    sa.set_trace_mode(1, SpectrumAnalyser.TraceMode.CLEAR_WRITE)
+    if sa.max_freq <= sa.min_freq + 2 * (sa.max_num_sweep_points + 1) * 1e6:
+        raise NotImplementedError
+
+    for ensure_stop_freq_is_covered in [True, False]:
+        for num_points in [
+            sa.min_num_sweep_points,
+        ]:
+            max_freq = sa.min_freq + 1e6 * (num_points - 1)
+            results = sa.perform_multi_part_sweep(
+                sa.min_freq,
+                max_freq,
+                1e6,
+                ensure_stop_freq_is_covered,
+                seconds_per_mhz=1e-3,
+                units=FieldStrengthUnits.DBUV_PER_M,
+            )
+            if ensure_stop_freq_is_covered:
+                assert (
+                    results.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][-1][
+                        0
+                    ]
+                    >= max_freq
+                )
+            else:
+                assert (
+                    results.datapoints[SpectrumAnalyser.DetectorType.POSITIVE_PEAK][-1][
+                        0
+                    ]
+                    <= max_freq
+                )
+
+
 def test_preamp(sa: SpectrumAnalyser):
     if sa.has_preamp:
         sa.enable_preamp()
@@ -309,7 +347,7 @@ def test_preamp(sa: SpectrumAnalyser):
         name=None,  # type: ignore
         expected_idn_response=None,  # type: ignore
         verify=None,  # type: ignore
-        logger=None,  # type: ignore
+        logging_level=logging.WARNING,
         min_freq=int(1e9),
         max_freq=int(2e9),
         min_num_sweep_points=10,

@@ -20,7 +20,7 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
         name: str,
         expected_idn_response: str,
         verify: bool,
-        logger: Logger,
+        logging_level: int,
         **kwargs,
     ):
         super().__init__(
@@ -29,7 +29,7 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             name=name,
             expected_idn_response=expected_idn_response,
             verify=verify,
-            logger=logger,
+            logging_level=logging_level,
             min_freq=0,
             max_freq=int(3.2e9),
             min_num_sweep_points=751,
@@ -113,19 +113,11 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
             # AmplitudeUnits.WATTS: "W",
         }
 
-    #####################################
-    # Override BaseInstrument functions #
-    #####################################
-    def set_local_control(self):
+    def _set_remote_control(self) -> None:
+        self._write("SYST:REM")
+
+    def _set_local_control(self) -> None:
         self._write("SYST:LOC")
-
-    def initialise(self):
-        super().initialise()
-        self._write(":SWE:MODE SWE")
-
-    #########################################
-    # Functions from SpectrumAnalyser class #
-    #########################################
 
     def _set_start_freq(self, freq_hz: float):
         self._write(f":FREQ:STAR {freq_hz}")
@@ -214,6 +206,7 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
 
     def _trigger_sweep(self) -> None:
         self._write(":INIT:IMM")
+        self._write(":INIT:IMM")
 
     def _get_trace_data(self, trace_num: int) -> list[float]:
         return [float(x) for x in self._query(f":TRAC{trace_num}:DATA?").split(",")]
@@ -277,3 +270,14 @@ class SiglentSSA3032XPlus(SpectrumAnalyser):
 
     def _get_sweep_time_auto_enabled_state(self) -> bool:
         return self._query(":SWE:TIME:AUTO?") == "1"
+
+    #############################################
+    # Override of already implemented functions #
+    #############################################
+
+    def get_instrument_errors(self) -> list[tuple[int, str]]:
+        error_register = int(self._query("*ESR?"))
+        if error_register == 0:
+            return []
+        else:
+            return [(error_register, "Unknown error")]  # pragma: no cover

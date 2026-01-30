@@ -16,7 +16,7 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
     (and optionally round to a certain number of decimal places)
     """
 
-    agilent_overload_magic_number = 9.9e37
+    agilent_overload_magic_num = 9.9e37
 
     si_prefixes = {
         1e12: "P",
@@ -31,7 +31,7 @@ def prefixify(x: float, units: str = "", decimal_places: Optional[int] = None) -
         1e-15: "f",
     }
 
-    if x == agilent_overload_magic_number:
+    if x == agilent_overload_magic_num:
         return "OVLD"
 
     sign_str = "-" if x < 0 else ""
